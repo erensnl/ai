@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Evren AI Interface</title>
+  <!-- React & React DOM -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <!-- Babel (JSX Derleyici) -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 9999px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #334155; }
+  </style>
+</head>
+<body class="bg-[#090d16] text-slate-100 font-sans antialiased">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    // --- İKON BİLEŞENLERİ ---
+    const IconSparkles = () => (
+      <svg className="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-6.857 2.286L11 21l-2.286-6.857L2 12l6.857-2.286L11 3z" />
+      </svg>
+    );
+
+    const IconPlus = () => (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+      </svg>
+    );
+
+    const IconPin = ({ pinned }) => (
+      <svg className={`w-4 h-4 ${pinned ? 'text-amber-400 fill-amber-400/20' : 'text-slate-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+      </svg>
+    );
+
+    const IconFolder = () => (
+      <svg className="w-4 h-4 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+      </svg>
+    );
+
+    const IconSearch = () => (
+      <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+      </svg>
+    );
+
+    const IconSettings = () => (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+      </svg>
+    );
+
+    const IconPaperclip = () => (
+      <svg className="w-5 h-5 text-slate-400 hover:text-slate-200 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+      </svg>
+    );
+
+    const IconSend = () => (
+      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+      </svg>
+    );
+
+    const IconCode = () => (
+      <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+      </svg>
+    );
+
+    const IconPlay = () => (
+      <svg className="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    );
+
+    const IconRefresh = () => (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+      </svg>
+    );
+
+    const IconX = () => (
+      <svg className="w-5 h-5 text-slate-400 hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+      </svg>
+    );
+
+    function App() {
+      const [sidebarOpen, setSidebarOpen] = useState(true);
+      const [searchQuery, setSearchQuery] = useState('');
+      const [inputPrompt, setInputPrompt] = useState('');
+      const [attachedFiles, setAttachedFiles] = useState([]);
+      const [showSettings, setShowSettings] = useState(false);
+      const [isGenerating, setIsGenerating] = useState(false);
+      const [activeArtifact, setActiveArtifact] = useState(null);
+      const [artifactTab, setArtifactTab] = useState('preview');
+      const [deviceViewport, setDeviceViewport] = useState('100%');
+
+      const [settings, setSettings] = useState({
+        baseUrl: 'https://api.evrensitesi.com/v1',
+        apiKey: '',
+        systemPrompt: 'Sen Eren Şenel tarafından geliştirilen Evren AI platformunda çalışan zeki, yardımsever ve profesyonel bir yapay zeka asistanısın.',
+        temperature: 0.7,
+        maxTokens: 2048,
+      });
+
+      const [availableModels, setAvailableModels] = useState([
+        { id: 'evren-gpt-4o', name: 'Evren GPT-4o (Önerilen)', provider: 'Evren API' },
+        { id: 'evren-claude-3-5-sonnet', name: 'Evren Claude 3.5 Sonnet', provider: 'Evren API' },
+        { id: 'evren-deepseek-r1', name: 'Evren DeepSeek-R1', provider: 'Evren API' },
+      ]);
+
+      const [selectedModel, setSelectedModel] = useState('evren-gpt-4o');
+      const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
+      const [customModelInput, setCustomModelInput] = useState('');
+      const [isFetchingModels, setIsFetchingModels] = useState(false);
+
+      const [chats, setChats] = useState([
+        {
+          id: 'demo-1',
+          title: 'Evren API Entegrasyonu & UI',
+          folder: 'Projeler',
+          pinned: true,
+          updatedAt: '12 Dakika önce',
+          messages: [
+            { id: 1, role: 'user', content: 'Kendi backend API modelim için harika bir web uygulaması kartı oluşturur musun?' },
+            {
+              id: 2,
+              role: 'assistant',
+              content: `Harika! İşte Evren API platformun için tasarladığım cam efektli (Glassmorphism) modern Tailwind CSS kart bileşeni.\n\nÖn izlemek için aşağıdaki kod bloğundaki **"Ön İzlemeyi Aç"** butonuna tıklayabilirsin!\n\n\`\`\`html\n<!DOCTYPE html>\n<html>\n<head>\n  <script src="https://cdn.tailwindcss.com"></script>\n</head>\n<body class="bg-slate-950 text-slate-100 flex items-center justify-center min-h-screen p-6">\n  <div class="relative group max-w-md w-full bg-slate-900/80 backdrop-blur-xl border border-slate-800 rounded-3xl p-6 shadow-2xl hover:border-indigo-500/50 transition-all duration-300">\n    <div class="flex items-center justify-between mb-4">\n      <span class="px-3 py-1 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-full text-xs font-semibold">EVREN API MODELİ</span>\n      <span class="w-3 h-3 bg-emerald-500 rounded-full animate-pulse"></span>\n    </div>\n    <h3 class="text-xl font-bold text-white mb-2">Canlı Yapay Zeka Servisi</h3>\n    <p class="text-slate-400 text-sm mb-6">Evren sitesi API altyapısı ile bağlı modellerinizin yanıt süresini ve performansını izleyebilirsiniz.</p>\n    <button class="w-full py-3 bg-gradient-to-r from-indigo-500 to-pink-500 text-white font-medium rounded-xl">Modeli Çalıştır</button>\n  </div>\n</body>\n</html>\n\`\`\``
+            }
+          ]
+        }
+      ]);
+
+      const [activeChatId, setActiveChatId] = useState('demo-1');
+      const activeChat = chats.find(c => c.id === activeChatId) || null;
+      const messagesEndRef = useRef(null);
+      const fileInputRef = useRef(null);
+
+      useEffect(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, [activeChat?.messages, isGenerating]);
+
+      const handleFetchModelsFromApi = async () => {
+        setIsFetchingModels(true);
+        try {
+          const response = await fetch(`${settings.baseUrl}/models`, {
+            method: 'GET',
+            headers: { 'Authorization': `Bearer ${settings.apiKey}`, 'Content-Type': 'application/json' }
+          });
+          if (!response.ok) throw new Error('Hata');
+          const data = await response.json();
+          if (data && data.data && Array.isArray(data.data)) {
+            const fetchedList = data.data.map(m => ({ id: m.id, name: m.id, provider: 'Evren API' }));
+            setAvailableModels(fetchedList);
+            if (fetchedList.length > 0) setSelectedModel(fetchedList[0].id);
+          }
+        } catch (error) {
+          console.warn("Modeller çekilemedi.");
+        } finally {
+          setIsFetchingModels(false);
+        }
+      };
+
+      const handleAddCustomModel = () => {
+        if (!customModelInput.trim()) return;
+        const newModel = { id: customModelInput.trim(), name: customModelInput.trim(), provider: 'Özel / Evren' };
+        setAvailableModels(prev => [...prev, newModel]);
+        setSelectedModel(newModel.id);
+        setCustomModelInput('');
+      };
+
+      const handleNewChat = () => {
+        const newId = `chat-${Date.now()}`;
+        const newChatObj = { id: newId, title: 'Yeni Sohbet', folder: 'Genel', pinned: false, updatedAt: 'Şimdi', messages: [] };
+        setChats([newChatObj, ...chats]);
+        setActiveChatId(newId);
+        setActiveArtifact(null);
+      };
+
+      const togglePin = (chatId, e) => {
+        e.stopPropagation();
+        setChats(chats.map(c => c.id === chatId ? { ...c, pinned: !c.pinned } : c));
+      };
+
+      const handleFileUpload = (e) => {
+        const files = Array.from(e.target.files);
+        if (!files.length) return;
+        setAttachedFiles(prev => [...prev, ...files.map(f => ({ name: f.name, size: (f.size / 1024).toFixed(1) + ' KB' }))]);
+      };
+
+      const handleSendMessage = async (promptToSend) => {
+        const text = promptToSend || inputPrompt;
+        if (!text.trim() && attachedFiles.length === 0) return;
+
+        let currentChatId = activeChatId;
+        let targetChat = activeChat;
+
+        if (!targetChat || targetChat.messages.length === 0) {
+          const newTitle = text.slice(0, 30) || 'Yeni Sohbet';
+          if (!targetChat) {
+            currentChatId = `chat-${Date.now()}`;
+            targetChat = { id: currentChatId, title: newTitle, folder: 'Genel', pinned: false, updatedAt: 'Şimdi', messages: [] };
+            setChats(prev => [targetChat, ...prev]);
+            setActiveChatId(currentChatId);
+          } else {
+            setChats(prev => prev.map(c => c.id === currentChatId ? { ...c, title: newTitle } : c));
+          }
+        }
+
+        const newUserMsg = { id: Date.now(), role: 'user', content: text, files: [...attachedFiles] };
+        setChats(prev => prev.map(c => c.id === currentChatId ? { ...c, messages: [...c.messages, newUserMsg] } : c));
+
+        setInputPrompt('');
+        setAttachedFiles([]);
+        setIsGenerating(true);
+
+        try {
+          const response = await fetch(`${settings.baseUrl}/chat/completions`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${settings.apiKey}` },
+            body: JSON.stringify({
+              model: selectedModel,
+              messages: [
+                { role: 'system', content: settings.systemPrompt },
+                ...targetChat.messages.map(m => ({ role: m.role, content: m.content })),
+                { role: 'user', content: text }
+              ],
+              temperature: settings.temperature,
+              max_tokens: settings.maxTokens
+            })
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            const aiText = data.choices[0]?.message?.content || 'Yanıt alınamadı.';
+            setChats(prev => prev.map(c => c.id === currentChatId ? {
+              ...c, messages: [...c.messages, { id: Date.now() + 1, role: 'assistant', content: aiText }]
+            } : c));
+          } else {
+            throw new Error('API Hatası');
+          }
+        } catch (err) {
+          setTimeout(() => {
+            const mockAiMsg = {
+              id: Date.now() + 1,
+              role: 'assistant',
+              content: `**Evren API Modeli (${selectedModel}):**\n\nTalebiniz başarıyla alındı. Ayarlar modalından geçerli bir Evren API Anahtarı ve Base URL girdiğinizde bu yanıt canlı modelinizden gelecektir.\n\n\`\`\`javascript\nconst evrenRequest = {\n  model: "${selectedModel}",\n  baseUrl: "${settings.baseUrl}",\n  prompt: "${text.replace(/"/g, '\\"')}"\n};\nconsole.log("İstek Evren API'sine iletildi!", evrenRequest);\n\`\`\``
+            };
+            setChats(prev => prev.map(c => c.id === currentChatId ? { ...c, messages: [...c.messages, mockAiMsg] } : c));
+            setIsGenerating(false);
+          }, 800);
+        } finally {
+          setIsGenerating(false);
+        }
+      };
+
+      const renderMessageContent = (content) => {
+        const parts = content.split(/(```[\s\S]*?```)/g);
+        return parts.map((part, index) => {
+          if (part.startsWith('```')) {
+            const firstLineEnd = part.indexOf('\n');
+            const language = part.slice(3, firstLineEnd).trim() || 'code';
+            const codeText = part.slice(firstLineEnd + 1, -3).trim();
+            const isPreviewable = ['html', 'javascript', 'js', 'svg', 'css'].includes(language.toLowerCase());
+
+            return (
+              <div key={index} className="my-4 rounded-xl border border-slate-800 bg-slate-950 overflow-hidden shadow-lg">
+                <div className="flex items-center justify-between px-4 py-2 bg-slate-900 border-b border-slate-800 text-xs">
+                  <span className="font-mono text-indigo-400 font-semibold uppercase">{language}</span>
+                  <div className="flex items-center gap-2">
+                    {isPreviewable && (
+                      <button
+                        onClick={() => { setActiveArtifact({ language, code: codeText }); setArtifactTab('preview'); }}
+                        className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-xs font-medium"
+                      >
+                        <IconPlay/> <span>Ön İzlemeyi Aç</span>
+                      </button>
+                    )}
+                    <button
+                      onClick={() => navigator.clipboard.writeText(codeText)}
+                      className="px-2.5 py-1 rounded bg-slate-800 text-slate-300 hover:bg-slate-700 text-xs"
+                    >
+                      Kodu Kopyala
+                    </button>
+                  </div>
+                </div>
+                <pre className="p-4 overflow-x-auto text-sm font-mono text-slate-200"><code>{codeText}</code></pre>
+              </div>
+            );
+          }
+          return (
+            <div key={index} className="whitespace-pre-wrap leading-relaxed text-slate-200 text-sm md:text-base">
+              {part.split('\n').map((line, i) => (
+                <span key={i}>{line}<br /></span>
+              ))}
+            </div>
+          );
+        });
+      };
+
+      const filteredChats = chats.filter(c => c.title.toLowerCase().includes(searchQuery.toLowerCase()));
+
+      return (
+        <div className="flex h-screen bg-[#090d16] text-slate-100 font-sans overflow-hidden">
+          {/* SIDEBAR */}
+          <aside className={`${sidebarOpen ? 'w-72 md:w-80' : 'w-0'} transition-all duration-300 bg-[#0f1523] border-r border-slate-800/80 flex flex-col z-20 relative overflow-hidden`}>
+            <div className="p-4 border-b border-slate-800/60 flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-500 to-pink-500 flex items-center justify-center">
+                    <IconSparkles/>
+                  </div>
+                  <span className="font-bold text-base text-white">EVREN AI INTERFACE</span>
+                </div>
+              </div>
+              <button onClick={handleNewChat} className="flex items-center justify-center gap-2 w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-medium transition">
+                <IconPlus/> <span>Yeni Sohbet</span>
+              </button>
+            </div>
+
+            <div className="px-4 py-3">
+              <div className="relative">
+                <span className="absolute inset-y-0 left-3 flex items-center"><IconSearch/></span>
+                <input
+                  type="text" placeholder="Sohbetlerde ara..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+                  className="w-full bg-slate-900 text-sm text-slate-200 pl-9 pr-3 py-2 rounded-xl border border-slate-800 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-3 py-2 space-y-2 custom-scrollbar">
+              {filteredChats.map(chat => (
+                <div
+                  key={chat.id} onClick={() => setActiveChatId(chat.id)}
+                  className={`flex items-center justify-between px-3 py-2.5 rounded-xl cursor-pointer text-sm ${activeChatId === chat.id ? 'bg-indigo-600/20 border border-indigo-500/30 text-white font-medium' : 'text-slate-300 hover:bg-slate-800/60'}`}
+                >
+                  <span className="truncate">{chat.title}</span>
+                  <button onClick={e => togglePin(chat.id, e)}><IconPin pinned="{chat.pinned}"/></button>
+                </div>
+              ))}
+            </div>
+
+            <div className="p-3 border-t border-slate-800 bg-slate-900/50 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center font-bold text-xs">EŞ</div>
+                <span className="text-xs font-medium text-white">Evren AI Portal</span>
+              </div>
+              <button onClick={() => setShowSettings(true)} className="p-2 text-slate-400 hover:text-white"><IconSettings/></button>
+            </div>
+          </aside>
+
+          {/* MAIN CONTENT */}
+          <main className="flex-1 flex flex-col h-full relative overflow-hidden">
+            <header className="h-16 border-b border-slate-800/80 bg-[#0f1523]/80 px-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                {!sidebarOpen && <button onClick={() => setSidebarOpen(true)} className="p-2 text-slate-400 hover:text-white"><IconSparkles/></button>}
+                <div className="relative">
+                  <button onClick={() => setModelDropdownOpen(!modelDropdownOpen)} className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-sm font-medium">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                    <span>{availableModels.find(m => m.id === selectedModel)?.name || selectedModel}</span>
+                  </button>
+                  {modelDropdownOpen && (
+                    <div className="absolute top-12 left-0 w-72 bg-slate-900 border border-slate-800 rounded-2xl p-2 z-50">
+                      {availableModels.map(m => (
+                        <button key={m.id} onClick={() => { setSelectedModel(m.id); setModelDropdownOpen(false); }} className="w-full text-left px-3 py-2 rounded-xl text-xs hover:bg-slate-800">
+                          {m.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <button onClick={handleFetchModelsFromApi} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 border border-slate-800 text-xs text-slate-300 rounded-xl">
+                <IconRefresh/> <span>{isFetchingModels ? 'Yükleniyor...' : "API'den Çek"}</span>
+              </button>
+            </header>
+
+            <div className="flex-1 flex overflow-hidden">
+              <div className="flex-1 flex flex-col h-full overflow-hidden">
+                <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 custom-scrollbar">
+                  {!activeChat || activeChat.messages.length === 0 ? (
+                    <div className="h-full flex flex-col items-center justify-center text-center space-y-6 py-12">
+                      <div className="w-16 h-16 rounded-3xl bg-indigo-600 flex items-center justify-center shadow-2xl"><IconSparkles/></div>
+                      <h1 className="text-3xl font-bold text-white">Evren AI Modeline Hoş Geldiniz</h1>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-xl w-full">
+                        {['React Tailwind Dashboard Yap', 'Python Web Scraper Yaz', 'API Performans Analizi', 'Sistem Prompt Özelleştirme'].map((t, idx) => (
+                          <button key={idx} onClick={() => handleSendMessage(t)} className="p-4 rounded-2xl bg-slate-900 border border-slate-800 text-left hover:border-indigo-500 text-sm text-slate-300">
+                            {t}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    activeChat.messages.map(msg => (
+                      <div key={msg.id} className={`flex gap-4 max-w-4xl mx-auto ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                        {msg.role === 'assistant' && <div className="w-9 h-9 rounded-2xl bg-indigo-600 flex items-center justify-center text-white shrink-0"><IconSparkles/></div>}
+                        <div className={`rounded-2xl p-5 max-w-[80%] ${msg.role === 'user' ? 'bg-indigo-600 text-white' : 'bg-[#0f1523] border border-slate-800 text-slate-200'}`}>
+                          {renderMessageContent(msg.content)}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                  <div ref={messagesEndRef} />
+                </div>
+
+                <div className="p-4 bg-[#090d16] border-t border-slate-800">
+                  <div className="max-w-4xl mx-auto bg-slate-900 border border-slate-800 rounded-3xl p-3 flex items-center gap-2">
+                    <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
+                    <button onClick={() => fileInputRef.current?.click()} className="p-2 text-slate-400 hover:text-white"><IconPaperclip/></button>
+                    <textarea
+                      rows="1" value={inputPrompt} onChange={e => setInputPrompt(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }}
+                      placeholder="Bir şeyler sorun..." className="flex-1 bg-transparent text-slate-100 text-sm focus:outline-none resize-none"
+                    />
+                    <button onClick={() => handleSendMessage()} className="p-3 bg-indigo-600 text-white rounded-2xl"><IconSend/></button>
+                  </div>
+                </div>
+              </div>
+
+              {/* SAĞ PANEL: CANLI KOD ÖN İZLEME */}
+              {activeArtifact && (
+                <div className="w-[500px] border-l border-slate-800 bg-[#0c101d] flex flex-col h-full">
+                  <div className="h-14 px-4 border-b border-slate-800 flex items-center justify-between">
+                    <div className="flex items-center gap-2"><IconCode/><span className="text-sm font-semibold text-white">Canlı Kod Ön İzleme</span></div>
+                    <button onClick={() => setActiveArtifact(null)} className="p-1 text-slate-400 hover:text-white"><IconX/></button>
+                  </div>
+                  <div className="flex-1 bg-slate-950">
+                    <iframe title="Artifact Preview" srcDoc={activeArtifact.code} className="w-full h-full bg-white" sandbox="allow-scripts" />
+                  </div>
+                </div>
+              )}
+            </div>
+          </main>
+
+          {/* AYARLAR MODALI */}
+          {showSettings && (
+            <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+              <div className="bg-[#0f1523] border border-slate-800 rounded-3xl max-w-lg w-full p-6 space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <h3 className="font-bold text-white">Evren API Ayarları</h3>
+                  <button onClick={() => setShowSettings(false)} className="text-slate-400 hover:text-white"><IconX/></button>
+                </div>
+                <div className="space-y-3 text-xs">
+                  <div>
+                    <label className="block text-slate-300 font-semibold mb-1">Base URL</label>
+                    <input type="text" value={settings.baseUrl} onChange={e => setSettings({ ...settings, baseUrl: e.target.value })} className="w-full bg-slate-900 p-2.5 rounded-xl border border-slate-800 text-white" />
+                  </div>
+                  <div>
+                    <label className="block text-slate-300 font-semibold mb-1">Evren API Key</label>
+                    <input type="password" placeholder="sk-evren-xxx" value={settings.apiKey} onChange={e => setSettings({ ...settings, apiKey: e.target.value })} className="w-full bg-slate-900 p-2.5 rounded-xl border border-slate-800 text-white" />
+                  </div>
+                </div>
+                <div className="flex justify-end pt-3">
+                  <button onClick={() => setShowSettings(false)} className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-medium">Kaydet</button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+  </script>
+</body>
+</html>
