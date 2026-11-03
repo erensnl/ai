@@ -5,12 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Evren AI Interface</title>
   <!-- React & React DOM -->
-  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="[https://unpkg.com/react@18/umd/react.production.min.js](https://unpkg.com/react@18/umd/react.production.min.js)"></script>
+  <script src="[https://unpkg.com/react-dom@18/umd/react-dom.production.min.js](https://unpkg.com/react-dom@18/umd/react-dom.production.min.js)"></script>
   <!-- Babel (JSX Derleyici) -->
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="[https://unpkg.com/@babel/standalone/babel.min.js](https://unpkg.com/@babel/standalone/babel.min.js)"></script>
   <!-- Tailwind CSS CDN -->
-  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="[https://cdn.tailwindcss.com](https://cdn.tailwindcss.com)"></script>
   <style>
     .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
     .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
@@ -99,6 +99,8 @@
       </svg>
     );
 
+    const demoCodeSnippet = "Harika! İşte Evren API platformun için tasarladığım cam efektli (Glassmorphism) modern Tailwind CSS kart bileşeni.\n\nÖn izlemek için aşağıdaki kod bloğundaki \"Ön İzlemeyi Aç\" butonuna tıklayabilirsin!\n\n```html\n<!DOCTYPE html>\n<html>\n<head>\n  <script src=\"https://cdn.tailwindcss.com\"></script>\n</head>\n<body class=\"bg-slate-950 text-slate-100 flex items-center justify-center min-h-screen p-6\">\n  <div class=\"relative group max-w-md w-full bg-slate-900/80 backdrop-blur-xl border border-slate-800 rounded-3xl p-6 shadow-2xl hover:border-indigo-500/50 transition-all duration-300\">\n    <div class=\"flex items-center justify-between mb-4\">\n      <span class=\"px-3 py-1 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-full text-xs font-semibold\">EVREN API MODELİ</span>\n      <span class=\"w-3 h-3 bg-emerald-500 rounded-full animate-pulse\"></span>\n    </div>\n    <h3 class=\"text-xl font-bold text-white mb-2\">Canlı Yapay Zeka Servisi</h3>\n    <p class=\"text-slate-400 text-sm mb-6\">Evren sitesi API altyapısı ile bağlı modellerinizin yanıt süresini ve performansını izleyebilirsiniz.</p>\n    <button class=\"w-full py-3 bg-gradient-to-r from-indigo-500 to-pink-500 text-white font-medium rounded-xl\">Modeli Çalıştır</button>\n  </div>\n</body>\n</html>\n```";
+
     function App() {
       const [sidebarOpen, setSidebarOpen] = useState(true);
       const [searchQuery, setSearchQuery] = useState('');
@@ -107,16 +109,21 @@
       const [showSettings, setShowSettings] = useState(false);
       const [isGenerating, setIsGenerating] = useState(false);
       const [activeArtifact, setActiveArtifact] = useState(null);
-      const [artifactTab, setArtifactTab] = useState('preview');
-      const [deviceViewport, setDeviceViewport] = useState('100%');
 
-      const [settings, setSettings] = useState({
-        baseUrl: 'https://api.evrensitesi.com/v1',
-        apiKey: '',
-        systemPrompt: 'Sen Eren Şenel tarafından geliştirilen Evren AI platformunda çalışan zeki, yardımsever ve profesyonel bir yapay zeka asistanısın.',
-        temperature: 0.7,
-        maxTokens: 2048,
+      const [settings, setSettings] = useState(() => {
+        const saved = localStorage.getItem('evren_ai_settings');
+        return saved ? JSON.parse(saved) : {
+          baseUrl: '[https://api.evrensitesi.com/v1](https://api.evrensitesi.com/v1)',
+          apiKey: '',
+          systemPrompt: 'Sen Eren Şenel tarafından geliştirilen Evren AI platformunda çalışan zeki, yardımsever ve profesyonel bir yapay zeka asistanısın.',
+          temperature: 0.7,
+          maxTokens: 2048,
+        };
       });
+
+      useEffect(() => {
+        localStorage.setItem('evren_ai_settings', JSON.stringify(settings));
+      }, [settings]);
 
       const [availableModels, setAvailableModels] = useState([
         { id: 'evren-gpt-4o', name: 'Evren GPT-4o (Önerilen)', provider: 'Evren API' },
@@ -126,7 +133,6 @@
 
       const [selectedModel, setSelectedModel] = useState('evren-gpt-4o');
       const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
-      const [customModelInput, setCustomModelInput] = useState('');
       const [isFetchingModels, setIsFetchingModels] = useState(false);
 
       const [chats, setChats] = useState([
@@ -141,7 +147,7 @@
             {
               id: 2,
               role: 'assistant',
-              content: `Harika! İşte Evren API platformun için tasarladığım cam efektli (Glassmorphism) modern Tailwind CSS kart bileşeni.\n\nÖn izlemek için aşağıdaki kod bloğundaki **"Ön İzlemeyi Aç"** butonuna tıklayabilirsin!\n\n\`\`\`html\n<!DOCTYPE html>\n<html>\n<head>\n  <script src="https://cdn.tailwindcss.com"></script>\n</head>\n<body class="bg-slate-950 text-slate-100 flex items-center justify-center min-h-screen p-6">\n  <div class="relative group max-w-md w-full bg-slate-900/80 backdrop-blur-xl border border-slate-800 rounded-3xl p-6 shadow-2xl hover:border-indigo-500/50 transition-all duration-300">\n    <div class="flex items-center justify-between mb-4">\n      <span class="px-3 py-1 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-full text-xs font-semibold">EVREN API MODELİ</span>\n      <span class="w-3 h-3 bg-emerald-500 rounded-full animate-pulse"></span>\n    </div>\n    <h3 class="text-xl font-bold text-white mb-2">Canlı Yapay Zeka Servisi</h3>\n    <p class="text-slate-400 text-sm mb-6">Evren sitesi API altyapısı ile bağlı modellerinizin yanıt süresini ve performansını izleyebilirsiniz.</p>\n    <button class="w-full py-3 bg-gradient-to-r from-indigo-500 to-pink-500 text-white font-medium rounded-xl">Modeli Çalıştır</button>\n  </div>\n</body>\n</html>\n\`\`\``
+              content: demoCodeSnippet
             }
           ]
         }
@@ -175,14 +181,6 @@
         } finally {
           setIsFetchingModels(false);
         }
-      };
-
-      const handleAddCustomModel = () => {
-        if (!customModelInput.trim()) return;
-        const newModel = { id: customModelInput.trim(), name: customModelInput.trim(), provider: 'Özel / Evren' };
-        setAvailableModels(prev => [...prev, newModel]);
-        setSelectedModel(newModel.id);
-        setCustomModelInput('');
       };
 
       const handleNewChat = () => {
@@ -260,7 +258,7 @@
             const mockAiMsg = {
               id: Date.now() + 1,
               role: 'assistant',
-              content: `**Evren API Modeli (${selectedModel}):**\n\nTalebiniz başarıyla alındı. Ayarlar modalından geçerli bir Evren API Anahtarı ve Base URL girdiğinizde bu yanıt canlı modelinizden gelecektir.\n\n\`\`\`javascript\nconst evrenRequest = {\n  model: "${selectedModel}",\n  baseUrl: "${settings.baseUrl}",\n  prompt: "${text.replace(/"/g, '\\"')}"\n};\nconsole.log("İstek Evren API'sine iletildi!", evrenRequest);\n\`\`\``
+              content: "**Evren API Modeli (" + selectedModel + "):**\n\nTalebiniz başarıyla alındı. Ayarlar modalından geçerli bir Evren API Anahtarı ve Base URL girdiğinizde bu yanıt canlı modelinizden gelecektir."
             };
             setChats(prev => prev.map(c => c.id === currentChatId ? { ...c, messages: [...c.messages, mockAiMsg] } : c));
             setIsGenerating(false);
@@ -286,7 +284,7 @@
                   <div className="flex items-center gap-2">
                     {isPreviewable && (
                       <button
-                        onClick={() => { setActiveArtifact({ language, code: codeText }); setArtifactTab('preview'); }}
+                        onClick={() => setActiveArtifact({ language, code: codeText })}
                         className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-xs font-medium"
                       >
                         <IconPlay/> <span>Ön İzlemeyi Aç</span>
