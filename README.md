@@ -25,8 +25,10 @@ Attachments are limited to TXT, Markdown, CSV, JSON, and PDF files up to 10 MB.
 Text and JSON files contribute at most their first 8000 characters to the
 OpenAI-compatible message; PDFs contribute safe filename/type/size metadata
 only because the current API contract has no multipart upload support. Images
-and code files can be previewed locally, but are sent as metadata unless their
-text content is supported by the browser.
+and code files can be previewed locally, and images copied to the clipboard
+can be pasted with Ctrl/Cmd+V into the composer. Pasted images follow the same
+10 MB and supported image MIME checks as selected files; they are sent as
+metadata because the current API contract has no multipart upload support.
 
 The interface also provides chat search, drag-and-drop attachments, pinned
 sections, category colors and sorting, Markdown/TXT/JSON export, message

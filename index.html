@@ -608,6 +608,23 @@ function App() {
     addFiles(event.dataTransfer.files);
   };
 
+  const handlePaste = (event) => {
+    const imageItem = Array.from(event.clipboardData?.items || [])
+      .find(item => item.kind === 'file' && item.type.startsWith('image/'));
+    if (!imageItem) return;
+
+    const blob = imageItem.getAsFile();
+    if (!blob) return;
+    event.preventDefault();
+    const extension = blob.type.split('/')[1]?.replace('jpeg', 'jpg') || 'png';
+    const pastedFile = new File(
+      [blob],
+      `panodan-yapistirilan-resim-${Date.now()}.${extension}`,
+      { type: blob.type, lastModified: Date.now() }
+    );
+    addFiles([pastedFile]);
+  };
+
   const buildAttachmentContext = async (files) => {
     if (!files.length) return '';
     const entries = await Promise.all(files.map(async ({ file, name, type, size }) => {
@@ -1096,6 +1113,7 @@ function App() {
                 <button onClick={() => fileInputRef.current?.click()} className="p-2 text-slate-400 hover:text-white" title="Dosya ekle"><IconPaperclip/></button>
                 <textarea
                   rows="1" value={inputPrompt} onChange={e => setInputPrompt(e.target.value)}
+                  onPaste={handlePaste}
                   onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }}
                   placeholder="Evren AI'a bir şey sorun..." className="flex-1 bg-transparent text-slate-100 text-sm focus:outline-none resize-none"
                 />
