@@ -163,6 +163,25 @@ const DEFAULT_MODELS = [
   { id: 'qwen3-vl-30b', name: 'Qwen 3-VL 30B', desc: 'Görsel ve video anlamaya odaklı model.' }
 ];
 
+const isChatModel = (model) => {
+  const id = typeof model === 'string' ? model : (model?.id || model?.name || '');
+  const task = typeof model === 'object' ? (model?.task || model?.type || '') : '';
+  const capabilities = typeof model === 'object' ? model?.capabilities : '';
+  const capabilityText = Array.isArray(capabilities) ? capabilities.join(' ') : JSON.stringify(capabilities || '');
+  const metadata = `${id} ${task} ${capabilityText}`;
+
+  return !/(^|[-_])(asr|audio|speech|stt|transcri|tts|embedding|rerank)([-_]|$)/i.test(metadata);
+};
+
+const loadSelectedModel = () => {
+  try {
+    const saved = localStorage.getItem('evren_ai_selected_model');
+    return saved && isChatModel(saved) ? saved : 'auto';
+  } catch (e) {
+    return 'auto';
+  }
+};
+
 function App() {
   const [user, setUser] = useState(null);
   const [isRegistering, setIsRegistering] = useState(false);
@@ -176,7 +195,7 @@ function App() {
   const [settings, setSettings] = useState(loadSettings);
 
   const [availableModels, setAvailableModels] = useState(DEFAULT_MODELS);
-  const [selectedModel, setSelectedModel] = useState('auto');
+  const [selectedModel, setSelectedModel] = useState(loadSelectedModel);
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
   const [isFetchingModels, setIsFetchingModels] = useState(false);
 
@@ -196,18 +215,20 @@ function App() {
         if (rawList.length > 0) {
           const fetchedList = rawList.map(m => {
             const modelId = typeof m === 'string' ? m : (m.id || m.name);
+            if (!isChatModel(m)) return null;
             const staticMatch = DEFAULT_MODELS.find(dm => dm.id === modelId);
             return {
               id: modelId,
               name: staticMatch ? staticMatch.name : modelId,
               desc: staticMatch ? staticMatch.desc : 'Evren AI Modeli'
             };
-          });
+          }).filter(Boolean);
           // "auto" seçeneği listede yoksa başa ekle
           if (!fetchedList.find(m => m.id === 'auto')) {
             fetchedList.unshift(DEFAULT_MODELS[0]);
           }
           setAvailableModels(fetchedList);
+          setSelectedModel(currentModel => fetchedList.some(m => m.id === currentModel) ? currentModel : 'auto');
           setIsFetchingModels(false);
           return;
         }
@@ -218,11 +239,18 @@ function App() {
       setIsFetchingModels(false);
     }
     setAvailableModels(DEFAULT_MODELS);
+    setSelectedModel(currentModel => DEFAULT_MODELS.some(m => m.id === currentModel) ? currentModel : 'auto');
   };
 
   useEffect(() => {
     handleFetchModelsFromApi();
   }, [settings.baseUrl]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('evren_ai_selected_model', selectedModel);
+    } catch (e) {}
+  }, [selectedModel]);
 
   const loadUserChats = async (userId) => {
     if (!supabaseClient || !userId) return;
@@ -459,7 +487,7 @@ function App() {
         id: `msg-${Date.now() + 1}`,
         chat_id: currentChatId,
         role: 'assistant',
-        content: "⚠️ **Evren API Bağlantı Uyarısı:**\n\nSunucu yanıt vermedi.\n\n**Hata:** " + err.message + "\n\nSol alttaki **Ayarlar (⚙️)** simgesinden Base URL adresini kontrol edin:\n`" + DEFAULT_BASE_URL + "`"
+        content: "⚠️ **Evren API Yanıt Uyarısı:**\n\nİstek proxy üzerinden gönderildi ancak geçerli bir sohbet yanıtı alınamadı.\n\n**Hata:** " + err.message + "\n\nAyarlar'daki Base URL şu proxy olmalı:\n`" + DEFAULT_BASE_URL + "`\n\nAudio/ASR modelleri sohbet isteklerinde kullanılamaz; model listesinden sohbet uyumlu bir model seçin veya `auto` kullanın."
       };
       setChats(prev => prev.map(c => c.id === currentChatId ? { ...c, messages: [...c.messages, mockAiMsg] } : c));
       if (supabaseClient) {
