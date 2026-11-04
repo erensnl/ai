@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Evren AI Interface</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#4f46e5">
 
 <!-- React & React DOM (cdnjs CDN) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
@@ -59,6 +61,7 @@ const DEFAULT_SETTINGS = {
 };
 const DEFAULT_CATEGORY = 'Genel';
 const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024;
+const MAX_INLINE_IMAGE_SIZE = 4 * 1024 * 1024;
 const SUPPORTED_ATTACHMENT_TYPES = new Set([
   'text/plain',
   'text/markdown',
@@ -195,8 +198,8 @@ const DEFAULT_MODELS = [
   { id: 'deepseek-v4.1-flash', name: 'DeepSeek V4.1 Flash', desc: 'Hızlı kod/ajan modeli, 1M bağlam.' },
   { id: 'mimo-v2.6-pro', name: 'Mimo V2.6 Pro', desc: 'Uzun ajan görevleri; görsel, video ve ses girdisi.' },
   { id: 'qwen3.8-flash-next', name: 'Qwen 3.8 Flash Next', desc: 'Hızlı sohbet, vibe coding ve ajan işleri.' },
-  { id: 'gemma-4-31b', name: 'Gemma 4 31B', desc: 'Görüntü anlama, grafik/ekran ve el yazısı okuma.' },
-  { id: 'qwen3-vl-30b', name: 'Qwen 3-VL 30B', desc: 'Görsel ve video anlamaya odaklı model.' }
+  { id: 'gemma-4-31b', name: 'Gemma 4 31B', desc: 'Görüntü anlama, grafik/ekran ve el yazısı okuma.', task: 'chat', capabilities: { vision: true } },
+  { id: 'qwen3-vl-30b', name: 'Qwen 3-VL 30B', desc: 'Görsel ve video anlamaya odaklı model.', task: 'vision_chat', capabilities: { vision: true } }
 ];
 
 const isChatModel = (model) => {
@@ -280,7 +283,9 @@ function App() {
             return {
               id: modelId,
               name: staticMatch ? staticMatch.name : modelId,
-              desc: staticMatch ? staticMatch.desc : 'Evren AI Modeli'
+              desc: staticMatch ? staticMatch.desc : 'Evren AI Modeli',
+              task: typeof m === 'object' ? m.task : undefined,
+              capabilities: typeof m === 'object' ? m.capabilities : undefined
             };
           }).filter(Boolean);
           // "auto" seçeneği listede yoksa başa ekle
@@ -436,12 +441,19 @@ function App() {
   const [compactMode, setCompactMode] = useState(false);
   const [lastUsage, setLastUsage] = useState(null);
   const [lastResponseTime, setLastResponseTime] = useState(null);
+  const [isCompareMode, setIsCompareMode] = useState(false);
+  const [compareModel, setCompareModel] = useState('auto');
+  const [promptTemplates, setPromptTemplates] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('evren_ai_prompt_templates') || '[]'); } catch (e) { return []; }
+  });
+  const [isListening, setIsListening] = useState(false);
   const activeChat = chats.find(c => c.id === activeChatId) || null;
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
   const searchInputRef = useRef(null);
   const abortControllerRef = useRef(null);
   const lastPromptRef = useRef('');
+  const recognitionRef = useRef(null);
 
   useEffect(() => {
     try {
@@ -458,6 +470,10 @@ function App() {
       localStorage.setItem('evren_ai_view_preferences', JSON.stringify({ categoryColors, theme, fontScale, compactMode }));
     } catch (e) {}
   }, [categoryColors, theme, fontScale, compactMode]);
+
+  useEffect(() => {
+    try { localStorage.setItem('evren_ai_prompt_templates', JSON.stringify(promptTemplates)); } catch (e) {}
+  }, [promptTemplates]);
 
   useEffect(() => {
     const onKeyDown = (event) => {
@@ -637,11 +653,70 @@ function App() {
     return `\n\nEk dosyalar (içerik yalnızca metin/JSON dosyalarında ilk 8000 karakterle sınırlıdır):\n${entries.join('\n\n')}`;
   };
 
+  const buildVisionContent = async (text, files) => {
+    const selected = availableModels.find(model => model.id === selectedModel);
+    const visionEnabled = Boolean(selected?.capabilities?.vision);
+    const imageFiles = files.filter(({ type }) => type.startsWith('image/'));
+    if (imageFiles.length && !visionEnabled) {
+      return `${text}\n\n[Görsel piksel analizi gönderilmedi: seçili model (${selectedModel || 'auto'}) vision desteklemiyor. Görsel metadata'sı kullanılabilir; qwen3-vl-30b, gemma-4-31b veya başka vision=true bir model seçin.]`;
+    }
+    const images = await Promise.all(files
+      .filter(({ type, size }) => type.startsWith('image/') && size <= MAX_INLINE_IMAGE_SIZE)
+      .map(({ file }) => new Promise(resolve => {
+        const reader = new FileReader();
+        reader.onload = () => resolve({ type: 'image_url', image_url: { url: reader.result } });
+        reader.onerror = () => resolve(null);
+        reader.readAsDataURL(file);
+      })));
+    const validImages = images.filter(Boolean);
+    if (!validImages.length) return text;
+    return [{ type: 'text', text }, ...validImages];
+  };
+
+  const speakText = (text) => {
+    if (!window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(normalizeText(text));
+    utterance.lang = 'tr-TR';
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const toggleListening = () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      window.alert('Bu tarayıcı mikrofonla konuşmayı desteklemiyor.');
+      return;
+    }
+    if (isListening) {
+      recognitionRef.current?.stop();
+      return;
+    }
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'tr-TR';
+    recognition.interimResults = true;
+    recognition.onstart = () => setIsListening(true);
+    recognition.onend = () => setIsListening(false);
+    recognition.onerror = () => setIsListening(false);
+    recognition.onresult = event => {
+      const transcript = Array.from(event.results).map(result => result[0].transcript).join('');
+      setInputPrompt(transcript);
+    };
+    recognitionRef.current = recognition;
+    recognition.start();
+  };
+
+  const savePromptTemplate = () => {
+    const name = window.prompt('Şablon adı:');
+    if (!name?.trim() || !inputPrompt.trim()) return;
+    setPromptTemplates(current => [...current, { name: name.trim(), prompt: inputPrompt }]);
+  };
+
   const handleSendMessage = async (promptToSend) => {
     const text = promptToSend || inputPrompt;
     if (!text.trim() && attachedFiles.length === 0) return;
     const attachmentContext = await buildAttachmentContext(attachedFiles);
     const requestText = `${text.trim()}${attachmentContext}`;
+    const apiContent = await buildVisionContent(requestText, attachedFiles);
     lastPromptRef.current = requestText;
 
     let currentChatId = activeChatId;
@@ -695,10 +770,11 @@ function App() {
         signal: abortControllerRef.current.signal,
         body: JSON.stringify({
           model: selectedModel || 'auto',
+          stream: true,
           messages: [
             { role: 'system', content: settings.systemPrompt },
             ...targetChat.messages.map(m => ({ role: m.role, content: m.content })),
-            { role: 'user', content: requestText }
+            { role: 'user', content: apiContent }
           ],
           temperature: settings.temperature,
           max_tokens: settings.maxTokens
@@ -706,10 +782,61 @@ function App() {
       });
 
       if (response && response.ok) {
-        const data = await response.json();
-        setLastUsage(data.usage || null);
+        let data;
+        let aiText = '';
+        if (/text\/event-stream/i.test(response.headers.get('content-type') || '') && response.body) {
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = '';
+          while (true) {
+            const { done, value } = await reader.read();
+            buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+            for (const line of lines) {
+              const payload = line.replace(/^data:\s*/, '').trim();
+              if (!payload || payload === '[DONE]') continue;
+              try {
+                const chunk = JSON.parse(payload);
+                aiText += chunk.choices?.[0]?.delta?.content || '';
+                if (chunk.usage) setLastUsage(chunk.usage);
+              } catch (e) {}
+            }
+            if (done) break;
+          }
+        } else {
+          data = await response.json();
+          aiText = data.choices?.[0]?.message?.content || '';
+          setLastUsage(data.usage || null);
+        }
         setLastResponseTime(Math.round(performance.now() - startedAt));
-        const aiText = data.choices?.[0]?.message?.content || 'Yanıt alınamadı.';
+        aiText = aiText || 'Yanıt alınamadı.';
+        if (isCompareMode && compareModel && compareModel !== selectedModel) {
+          try {
+            const comparisonResponse = await fetch(`${cleanBaseUrl(settings.baseUrl)}/chat/completions`, {
+              method: 'POST',
+              headers,
+              signal: abortControllerRef.current.signal,
+              body: JSON.stringify({
+                model: compareModel,
+                messages: [
+                  { role: 'system', content: settings.systemPrompt },
+                  ...targetChat.messages.map(m => ({ role: m.role, content: m.content })),
+                  { role: 'user', content: apiContent }
+                ],
+                temperature: settings.temperature,
+                max_tokens: settings.maxTokens
+              })
+            });
+            if (comparisonResponse.ok) {
+              const comparisonData = await comparisonResponse.json();
+              const comparisonText = comparisonData.choices?.[0]?.message?.content;
+              if (comparisonText) aiText += `\n\n---\n\n**${compareModel} karşılaştırması:**\n${comparisonText}`;
+            }
+          } catch (comparisonError) {
+            aiText += `\n\n**Karşılaştırma kullanılamadı:** ${comparisonError.message}`;
+          }
+        }
         const aiMsgId = `msg-${Date.now() + 1}`;
         const newAiMsg = { id: aiMsgId, chat_id: currentChatId, role: 'assistant', content: aiText };
 
@@ -718,6 +845,7 @@ function App() {
         if (supabaseClient) {
           await supabaseClient.from('messages').insert([newAiMsg]);
         }
+        speakText(aiText);
       } else {
         const status = response ? response.status : 'bilinmiyor';
         let detail = '';
@@ -1046,6 +1174,13 @@ function App() {
                 </div>
               )}
             </div>
+            <label className="flex items-center gap-1 text-[10px] text-slate-400">
+              <input type="checkbox" checked={isCompareMode} onChange={e => setIsCompareMode(e.target.checked)} />
+              Karşılaştır
+            </label>
+            {isCompareMode && <select value={compareModel} onChange={e => setCompareModel(e.target.value)} className="bg-slate-900 border border-slate-800 rounded-xl text-[10px] px-2 py-1.5">
+              {availableModels.map(model => <option key={model.id} value={model.id}>{model.name}</option>)}
+            </select>}
           </div>
 
           <div className="flex items-center gap-2">
@@ -1088,6 +1223,7 @@ function App() {
                       {renderMessageContent(msg.content)}
                       <div className="flex items-center gap-2 mt-3 pt-2 border-t border-white/10 opacity-70">
                         <button onClick={() => copyMessage(msg.content)} className="text-[10px] hover:text-white">Kopyala</button>
+                        {msg.role === 'assistant' && <button onClick={() => speakText(msg.content)} className="text-[10px] hover:text-white">Sesli oku</button>}
                         {msg.role === 'user' && <button onClick={() => editMessage(msg)} className="text-[10px] hover:text-white">Düzenle</button>}
                         {msg.role === 'assistant' && <button onClick={() => regenerateMessage(activeChat, messageIndex)} className="text-[10px] hover:text-white">Yeniden kullan</button>}
                       </div>
@@ -1117,6 +1253,8 @@ function App() {
                   onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }}
                   placeholder="Evren AI'a bir şey sorun..." className="flex-1 bg-transparent text-slate-100 text-sm focus:outline-none resize-none"
                 />
+                <button onClick={toggleListening} className={`p-2 rounded-xl ${isListening ? 'bg-rose-600 text-white' : 'text-slate-400 hover:text-white'}`} title="Mikrofonla sor">{isListening ? '■' : '🎙'}</button>
+                <button onClick={savePromptTemplate} className="p-2 text-slate-400 hover:text-white" title="Prompt şablonu kaydet">☆</button>
                 {isGenerating ? <button onClick={stopGeneration} className="px-3 py-2 bg-rose-600 text-white rounded-2xl text-xs">Durdur</button> : <button onClick={() => handleSendMessage()} className="p-3 bg-indigo-600 text-white rounded-2xl"><IconSend/></button>}
               </div>
               {attachedFiles.length > 0 && (
@@ -1134,6 +1272,7 @@ function App() {
                 </div>
               )}
               <p className="max-w-4xl mx-auto mt-2 text-[10px] text-slate-600">Ekler 10 MB ile sınırlıdır. Metin/JSON dosyalarının yalnızca ilk 8000 karakteri isteğe eklenir; PDF için yalnızca dosya adı ve metadata gönderilir.</p>
+              {promptTemplates.length > 0 && <div className="max-w-4xl mx-auto flex gap-2 mt-2 overflow-x-auto">{promptTemplates.map((template, index) => <button key={`${template.name}-${index}`} onClick={() => setInputPrompt(template.prompt)} className="text-[10px] px-2 py-1 rounded bg-slate-800 text-slate-400">{template.name}</button>)}</div>}
             </div>
           </div>
 
@@ -1189,6 +1328,9 @@ function App() {
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
+}
 </script>
 </body>
 </html>

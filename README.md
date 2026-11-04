@@ -39,3 +39,18 @@ setting for compatibility; production deployments should move the key to a
 server-side Vercel environment variable named `EVREN_API_KEY`; the proxy
 prefers that value and only falls back to the client Authorization header when
 the environment variable is absent.
+
+Streaming is requested with the existing OpenAI-compatible `stream` field and
+falls back to normal JSON when the upstream does not return SSE. Requests have
+a 45-second proxy timeout and one retry for transient failures. Vision images
+under 4 MB are sent as OpenAI-compatible base64 image content; if the model or
+upstream rejects vision, the request remains usable with filename/type/size
+metadata.
+
+Supabase remains the source of truth when the current `chats.folder`,
+`chats.pinned`, and `messages` fields are available. Settings, prompt
+templates, category colors, and attachment previews also have localStorage
+fallbacks. Production should enable RLS policies for each authenticated user's
+own chats/messages and set `EVREN_API_KEY` in Vercel. Audio transcription and
+multipart PDF upload require upstream endpoints not present in the current API
+contract, so microphone/TTS use browser APIs and PDFs are metadata-only.

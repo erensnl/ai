@@ -28,6 +28,10 @@ const createResponse = () => ({
     this.body = payload;
     return this;
   },
+  write(payload) {
+    this.body = `${this.body || ''}${payload.toString()}`;
+    return true;
+  },
   end() {
     return this;
   },
@@ -87,6 +91,33 @@ test('returns JSON error for malformed JSON', async () => {
       error: 'Evren API geçersiz JSON döndürdü',
       upstreamStatus: 200,
     });
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test('passes through server-sent event responses without JSON buffering', async () => {
+  const originalFetch = global.fetch;
+  const encoder = new TextEncoder();
+  global.fetch = async () => ({
+    status: 200,
+    headers: new Headers({ 'content-type': 'text/event-stream' }),
+    body: new ReadableStream({
+      start(controller) {
+        controller.enqueue(encoder.encode('data: {"choices":[{"delta":{"content":"hi"}}]}\n\n'));
+        controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+        controller.close();
+      },
+    }),
+  });
+
+  try {
+    const response = createResponse();
+    await handler({ method: 'POST', query: { path: 'chat/completions' }, headers: {}, body: '{}' }, response);
+
+    assert.equal(response.statusCode, 200);
+    assert.match(response.body, /data: \[DONE\]/);
+    assert.equal(response.headers['Content-Type'], 'text/event-stream');
   } finally {
     global.fetch = originalFetch;
   }
