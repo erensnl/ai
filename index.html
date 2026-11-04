@@ -4,13 +4,15 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Evren AI Interface</title>
-  <!-- React & React DOM -->
-  <script src="[https://unpkg.com/react@18/umd/react.production.min.js](https://unpkg.com/react@18/umd/react.production.min.js)"></script>
-  <script src="[https://unpkg.com/react-dom@18/umd/react-dom.production.min.js](https://unpkg.com/react-dom@18/umd/react-dom.production.min.js)"></script>
-  <!-- Babel (JSX Derleyici) -->
-  <script src="[https://unpkg.com/@babel/standalone/babel.min.js](https://unpkg.com/@babel/standalone/babel.min.js)"></script>
+  <!-- React & React DOM (cdnjs CDN) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <!-- Babel Standalone (cdnjs CDN) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
   <!-- Tailwind CSS CDN -->
-  <script src="[https://cdn.tailwindcss.com](https://cdn.tailwindcss.com)"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Supabase JS Client (jsdelivr CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
     .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
@@ -22,6 +24,17 @@
   <div id="root"></div>
 
   <script type="text/babel">
+    // ==========================================
+    // SUPABASE BİLGİLERİNİZİ BURAYA YAZIN
+    // ==========================================
+    const SUPABASE_URL = "https://vkpfnopdpdseasqnrzan.supabase.co"; 
+    const SUPABASE_ANON_KEY = "sb_publishable_OebKjfLIZKQY2tpHlo8Bjg_1awC229-";                  
+
+    // Supabase istemcisini başlatma
+    const supabaseClient = (SUPABASE_URL.includes("sizin-proje-id") || !window.supabase) 
+      ? null 
+      : window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
     const { useState, useEffect, useRef } = React;
 
     // --- İKON BİLEŞENLERİ ---
@@ -40,12 +53,6 @@
     const IconPin = ({ pinned }) => (
       <svg className={`w-4 h-4 ${pinned ? 'text-amber-400 fill-amber-400/20' : 'text-slate-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
-      </svg>
-    );
-
-    const IconFolder = () => (
-      <svg className="w-4 h-4 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
       </svg>
     );
 
@@ -99,21 +106,36 @@
       </svg>
     );
 
-    const demoCodeSnippet = "Harika! İşte Evren API platformun için tasarladığım cam efektli (Glassmorphism) modern Tailwind CSS kart bileşeni.\n\nÖn izlemek için aşağıdaki kod bloğundaki \"Ön İzlemeyi Aç\" butonuna tıklayabilirsin!\n\n```html\n<!DOCTYPE html>\n<html>\n<head>\n  <script src=\"https://cdn.tailwindcss.com\"></script>\n</head>\n<body class=\"bg-slate-950 text-slate-100 flex items-center justify-center min-h-screen p-6\">\n  <div class=\"relative group max-w-md w-full bg-slate-900/80 backdrop-blur-xl border border-slate-800 rounded-3xl p-6 shadow-2xl hover:border-indigo-500/50 transition-all duration-300\">\n    <div class=\"flex items-center justify-between mb-4\">\n      <span class=\"px-3 py-1 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-full text-xs font-semibold\">EVREN API MODELİ</span>\n      <span class=\"w-3 h-3 bg-emerald-500 rounded-full animate-pulse\"></span>\n    </div>\n    <h3 class=\"text-xl font-bold text-white mb-2\">Canlı Yapay Zeka Servisi</h3>\n    <p class=\"text-slate-400 text-sm mb-6\">Evren sitesi API altyapısı ile bağlı modellerinizin yanıt süresini ve performansını izleyebilirsiniz.</p>\n    <button class=\"w-full py-3 bg-gradient-to-r from-indigo-500 to-pink-500 text-white font-medium rounded-xl\">Modeli Çalıştır</button>\n  </div>\n</body>\n</html>\n```";
+    const IconLogout = () => (
+      <svg className="w-4 h-4 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+      </svg>
+    );
+
+    const IconMail = () => (
+      <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+      </svg>
+    );
+
+    const IconLock = () => (
+      <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+      </svg>
+    );
 
     function App() {
-      const [sidebarOpen, setSidebarOpen] = useState(true);
-      const [searchQuery, setSearchQuery] = useState('');
-      const [inputPrompt, setInputPrompt] = useState('');
-      const [attachedFiles, setAttachedFiles] = useState([]);
-      const [showSettings, setShowSettings] = useState(false);
-      const [isGenerating, setIsGenerating] = useState(false);
-      const [activeArtifact, setActiveArtifact] = useState(null);
+      const [user, setUser] = useState(null);
+      const [isRegistering, setIsRegistering] = useState(false);
+      const [loadingAuth, setLoadingAuth] = useState(false);
+
+      const [emailInput, setEmailInput] = useState('');
+      const [passwordInput, setPasswordInput] = useState('');
 
       const [settings, setSettings] = useState(() => {
         const saved = localStorage.getItem('evren_ai_settings');
         return saved ? JSON.parse(saved) : {
-          baseUrl: '[https://api.evrensitesi.com/v1](https://api.evrensitesi.com/v1)',
+          baseUrl: 'https://api.evrensitesi.com/v1',
           apiKey: '',
           systemPrompt: 'Sen Eren Şenel tarafından geliştirilen Evren AI platformunda çalışan zeki, yardımsever ve profesyonel bir yapay zeka asistanısın.',
           temperature: 0.7,
@@ -122,8 +144,83 @@
       });
 
       useEffect(() => {
+        if (supabaseClient) {
+          supabaseClient.auth.getSession().then(({ data: { session } }) => {
+            setUser(session?.user ?? null);
+          });
+
+          const { data: { subscription } } = supabaseClient.auth.onAuthStateChange((_event, session) => {
+            setUser(session?.user ?? null);
+          });
+
+          return () => subscription.unsubscribe();
+        } else {
+          const savedUser = localStorage.getItem('evren_ai_user_email');
+          if (savedUser && localStorage.getItem('evren_ai_logged_in') === 'true') {
+            setUser({ email: savedUser });
+          }
+        }
+      }, []);
+
+      useEffect(() => {
         localStorage.setItem('evren_ai_settings', JSON.stringify(settings));
       }, [settings]);
+
+      const handleAuthSubmit = async (e) => {
+        e.preventDefault();
+        if (!emailInput.trim() || !passwordInput.trim()) {
+          alert('Lütfen e-posta adresinizi ve şifrenizi girin!');
+          return;
+        }
+
+        setLoadingAuth(true);
+
+        if (supabaseClient) {
+          if (isRegistering) {
+            const { data, error } = await supabaseClient.auth.signUp({
+              email: emailInput.trim(),
+              password: passwordInput.trim(),
+            });
+            setLoadingAuth(false);
+            if (error) {
+              alert('Kayıt Hatası: ' + error.message);
+            } else {
+              alert('Kayıt başarılı! Giriş yapabilirsiniz.');
+              setIsRegistering(false);
+            }
+          } else {
+            const { data, error } = await supabaseClient.auth.signInWithPassword({
+              email: emailInput.trim(),
+              password: passwordInput.trim(),
+            });
+            setLoadingAuth(false);
+            if (error) {
+              alert('Giriş Hatası: ' + error.message);
+            }
+          }
+        } else {
+          localStorage.setItem('evren_ai_user_email', emailInput.trim());
+          localStorage.setItem('evren_ai_logged_in', 'true');
+          setUser({ email: emailInput.trim() });
+          setLoadingAuth(false);
+        }
+      };
+
+      const handleLogout = async () => {
+        if (supabaseClient) {
+          await supabaseClient.auth.signOut();
+        }
+        localStorage.removeItem('evren_ai_logged_in');
+        setUser(null);
+      };
+
+      const [sidebarOpen, setSidebarOpen] = useState(true);
+      const [searchQuery, setSearchQuery] = useState('');
+      const [inputPrompt, setInputPrompt] = useState('');
+      const [attachedFiles, setAttachedFiles] = useState([]);
+      const [showSettings, setShowSettings] = useState(false);
+      const [isGenerating, setIsGenerating] = useState(false);
+      const [activeArtifact, setActiveArtifact] = useState(null);
 
       const [availableModels, setAvailableModels] = useState([
         { id: 'evren-gpt-4o', name: 'Evren GPT-4o (Önerilen)', provider: 'Evren API' },
@@ -138,16 +235,16 @@
       const [chats, setChats] = useState([
         {
           id: 'demo-1',
-          title: 'Evren API Entegrasyonu & UI',
+          title: 'Evren AI Platformuna Hoş Geldiniz',
           folder: 'Projeler',
           pinned: true,
-          updatedAt: '12 Dakika önce',
+          updatedAt: 'Şimdi',
           messages: [
-            { id: 1, role: 'user', content: 'Kendi backend API modelim için harika bir web uygulaması kartı oluşturur musun?' },
+            { id: 1, role: 'user', content: 'Sistem nasıl çalışıyor?' },
             {
               id: 2,
               role: 'assistant',
-              content: demoCodeSnippet
+              content: 'Başarıyla giriş yaptınız! Hesabınız aktif durumda. Sol alttaki **Ayarlar (⚙️)** simgesinden API sunucu adresinizi ve anahtarınızı tanımlayabilir, sohbetlerinizi yönetebilirsiniz.'
             }
           ]
         }
@@ -258,7 +355,7 @@
             const mockAiMsg = {
               id: Date.now() + 1,
               role: 'assistant',
-              content: "**Evren API Modeli (" + selectedModel + "):**\n\nTalebiniz başarıyla alındı. Ayarlar modalından geçerli bir Evren API Anahtarı ve Base URL girdiğinizde bu yanıt canlı modelinizden gelecektir."
+              content: "**Evren AI (" + selectedModel + "):**\n\nYanıtınız başarıyla işlendi. (API sunucunuza bağlandığınızda yanıtlar doğrudan modelinizden akacaktır)."
             };
             setChats(prev => prev.map(c => c.id === currentChatId ? { ...c, messages: [...c.messages, mockAiMsg] } : c));
             setIsGenerating(false);
@@ -314,6 +411,79 @@
 
       const filteredChats = chats.filter(c => c.title.toLowerCase().includes(searchQuery.toLowerCase()));
 
+      if (!user) {
+        return (
+          <div className="min-h-screen bg-[#090d16] flex items-center justify-center p-4 relative overflow-hidden font-sans">
+            <div className="absolute w-[500px] h-[500px] bg-indigo-600/15 rounded-full blur-3xl -top-32 -left-32 pointer-events-none"></div>
+            <div className="absolute w-[500px] h-[500px] bg-pink-600/15 rounded-full blur-3xl -bottom-32 -right-32 pointer-events-none"></div>
+
+            <div className="max-w-md w-full bg-[#0f1523]/90 backdrop-blur-2xl border border-slate-800/80 rounded-3xl p-8 shadow-2xl relative z-10">
+              <div className="flex flex-col items-center text-center mb-8">
+                <div className="w-16 h-16 rounded-3xl bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center mb-4 shadow-xl shadow-indigo-500/20">
+                  <IconSparkles/>
+                </div>
+                <h1 className="text-2xl font-extrabold text-white tracking-tight">EVREN AI PORTAL</h1>
+                <p className="text-slate-400 text-xs mt-1.5">
+                  {isRegistering ? 'Yeni bir hesap oluşturun' : 'Devam etmek için hesabınıza giriş yapın'}
+                </p>
+              </div>
+
+              <form onSubmit={handleAuthSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1.5 uppercase tracking-wider">
+                    E-posta Adresi
+                  </label>
+                  <div className="relative flex items-center">
+                    <span className="absolute left-3.5"><IconMail/></span>
+                    <input
+                      type="email"
+                      required
+                      value={emailInput}
+                      onChange={e => setEmailInput(e.target.value)}
+                      placeholder="eposta@evren.com"
+                      className="w-full bg-slate-900/90 border border-slate-800 rounded-xl py-3 pl-11 pr-4 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1.5 uppercase tracking-wider">
+                    Şifre
+                  </label>
+                  <div className="relative flex items-center">
+                    <span className="absolute left-3.5"><IconLock/></span>
+                    <input
+                      type="password"
+                      required
+                      value={passwordInput}
+                      onChange={e => setPasswordInput(e.target.value)}
+                      placeholder="••••••••"
+                      className="w-full bg-slate-900/90 border border-slate-800 rounded-xl py-3 pl-11 pr-4 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loadingAuth}
+                  className="w-full py-3.5 px-4 bg-gradient-to-r from-indigo-600 via-indigo-500 to-pink-500 hover:opacity-95 text-white font-semibold rounded-xl transition shadow-lg shadow-indigo-600/25 active:scale-[0.98] mt-2 disabled:opacity-50"
+                >
+                  {loadingAuth ? 'İşleniyor...' : (isRegistering ? 'Kayıt Ol' : 'Giriş Yap')}
+                </button>
+              </form>
+
+              <div className="mt-6 pt-6 border-t border-slate-800/80 text-center text-xs text-slate-400">
+                {isRegistering ? (
+                  <span>Zaten hesabınız var mı? <button onClick={() => setIsRegistering(false)} className="text-indigo-400 font-semibold hover:underline">Giriş Yapın</button></span>
+                ) : (
+                  <span>Hesabınız yok mu? <button onClick={() => setIsRegistering(true)} className="text-indigo-400 font-semibold hover:underline">Hemen Kayıt Olun</button></span>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      }
+
       return (
         <div className="flex h-screen bg-[#090d16] text-slate-100 font-sans overflow-hidden">
           {/* SIDEBAR */}
@@ -355,11 +525,19 @@
             </div>
 
             <div className="p-3 border-t border-slate-800 bg-slate-900/50 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center font-bold text-xs">EŞ</div>
-                <span className="text-xs font-medium text-white">Evren AI Portal</span>
+              <div className="flex items-center gap-2 overflow-hidden">
+                <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center font-bold text-xs shrink-0">
+                  {user.email ? user.email.substring(0, 2).toUpperCase() : 'EŞ'}
+                </div>
+                <div className="flex flex-col truncate">
+                  <span className="text-xs font-medium text-white truncate">{user.email}</span>
+                  <span className="text-[10px] text-emerald-400">● Oturum Açık</span>
+                </div>
               </div>
-              <button onClick={() => setShowSettings(true)} className="p-2 text-slate-400 hover:text-white"><IconSettings/></button>
+              <div className="flex items-center gap-1 shrink-0">
+                <button onClick={() => setShowSettings(true)} className="p-2 text-slate-400 hover:text-white" title="API Ayarları"><IconSettings/></button>
+                <button onClick={handleLogout} className="p-2 text-slate-400 hover:text-rose-400" title="Çıkış Yap"><IconLogout/></button>
+              </div>
             </div>
           </aside>
 
@@ -431,7 +609,6 @@
                 </div>
               </div>
 
-              {/* SAĞ PANEL: CANLI KOD ÖN İZLEME */}
               {activeArtifact && (
                 <div className="w-[500px] border-l border-slate-800 bg-[#0c101d] flex flex-col h-full">
                   <div className="h-14 px-4 border-b border-slate-800 flex items-center justify-between">
@@ -446,7 +623,6 @@
             </div>
           </main>
 
-          {/* AYARLAR MODALI */}
           {showSettings && (
             <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
               <div className="bg-[#0f1523] border border-slate-800 rounded-3xl max-w-lg w-full p-6 space-y-4">
