@@ -1,8 +1,12 @@
 {
   "rewrites": [
     {
-      "source": "/evren-api/:path*",
-      "destination": "https://evren.ssyz.org.tr/llm/:path*"
+      "source": "/evren-api/chat/completions",
+      "destination": "https://evren.ssyz.org.tr/llm/chat/completions"
+    },
+    {
+      "source": "/evren-api/models",
+      "destination": "https://evren.ssyz.org.tr/llm/models"
     }
   ]
 }
