@@ -1,9 +1,12 @@
 // Evren API proxy (Vercel Serverless Function)
 // vercel.json yönlendirmesi sayesinde:
-//   /api/evren-api/models            -> https://evren.ssyz.org.tr/llm/models
-//   /api/evren-api/chat/completions  -> https://evren.ssyz.org.tr/llm/chat/completions
+//   /api/evren-api/models            -> https://evren-llmapi.ssyz.org.tr/v1/models
+//   /api/evren-api/chat/completions  -> https://evren-llmapi.ssyz.org.tr/v1/chat/completions
 
-const UPSTREAM = 'https://evren.ssyz.org.tr/llm';
+const UPSTREAM = 'https://evren-llmapi.ssyz.org.tr/v1';
+
+const isJsonContentType = (contentType) =>
+  Boolean(contentType && /^(?:application|text)\/(?:[\w.-]+\+)?json\b/i.test(contentType));
 
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -31,9 +34,24 @@ module.exports = async function handler(req, res) {
     const upstream = await fetch(target, { method: req.method, headers, body });
 
     const text = await upstream.text();
-    res.status(upstream.status);
-    res.setHeader('Content-Type', upstream.headers.get('content-type') || 'application/json');
-    return res.send(text);
+    const contentType = upstream.headers.get('content-type') || '';
+
+    if (!isJsonContentType(contentType)) {
+      return res.status(502).json({
+        error: 'Evren API geçersiz bir yanıt döndürdü',
+        detail: 'Upstream yanıtı JSON yerine HTML veya başka bir içerik türündeydi',
+        upstreamStatus: upstream.status,
+      });
+    }
+
+    try {
+      return res.status(upstream.status).json(JSON.parse(text));
+    } catch (err) {
+      return res.status(502).json({
+        error: 'Evren API geçersiz JSON döndürdü',
+        upstreamStatus: upstream.status,
+      });
+    }
   } catch (err) {
     return res.status(502).json({
       error: 'Evren sunucusuna ulaşılamadı',
