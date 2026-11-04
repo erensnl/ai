@@ -123,10 +123,15 @@
       </svg>
     );
 
+    // STATİK MODEL TANIMLARI
     const DEFAULT_MODELS = [
-      { id: 'evren-gpt-4o', name: 'Evren GPT-4o', provider: 'Evren API' },
-      { id: 'evren-claude-3-5-sonnet', name: 'Evren Claude 3.5 Sonnet', provider: 'Evren API' },
-      { id: 'evren-deepseek-r1', name: 'Evren DeepSeek-R1', provider: 'Evren API' }
+      { id: 'auto', name: 'Auto (Otomatik Yönlendirme)', desc: 'EVREN isteğe göre en uygun modeli kendisi seçer.' },
+      { id: 'glm-5.3', name: 'GLM-5.3', desc: 'Derin akıl yürütme, kod ve uzun belge analizi.' },
+      { id: 'deepseek-v4.1-flash', name: 'DeepSeek V4.1 Flash', desc: 'Hızlı kod/ajan modeli, 1M bağlam.' },
+      { id: 'mimo-v2.6-pro', name: 'Mimo V2.6 Pro', desc: 'Uzun ajan görevleri; görsel, video ve ses girdisi.' },
+      { id: 'qwen3.8-flash-next', name: 'Qwen 3.8 Flash Next', desc: 'Hızlı sohbet, vibe coding ve ajan işleri.' },
+      { id: 'gemma-4-31b', name: 'Gemma 4 31B', desc: 'Görüntü anlama, grafik/ekran ve el yazısı okuma.' },
+      { id: 'qwen3-vl-30b', name: 'Qwen 3-VL 30B', desc: 'Görsel ve video anlamaya odaklı model.' }
     ];
 
     function App() {
@@ -152,11 +157,10 @@
       });
 
       const [availableModels, setAvailableModels] = useState(DEFAULT_MODELS);
-      const [selectedModel, setSelectedModel] = useState('evren-gpt-4o');
+      const [selectedModel, setSelectedModel] = useState('auto');
       const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
       const [isFetchingModels, setIsFetchingModels] = useState(false);
 
-      // SESSİZ SÜRÜCÜ: CORS HATA ALINSA DAHİ UYGULAMAYI KİLİTLEMEZ
       const handleFetchModelsFromApi = async () => {
         setIsFetchingModels(true);
         try {
@@ -168,25 +172,27 @@
             const data = await res.json();
             let rawList = Array.isArray(data) ? data : (data.data || []);
             if (rawList.length > 0) {
-              const fetchedList = rawList.map(m => ({
-                id: typeof m === 'string' ? m : (m.id || m.name),
-                name: typeof m === 'string' ? m : (m.id || m.name),
-                provider: 'Evren API'
-              }));
+              const fetchedList = rawList.map(m => {
+                const modelId = typeof m === 'string' ? m : (m.id || m.name);
+                const staticMatch = DEFAULT_MODELS.find(dm => dm.id === modelId);
+                return {
+                  id: modelId,
+                  name: staticMatch ? staticMatch.name : modelId,
+                  desc: staticMatch ? staticMatch.desc : 'Evren AI Modeli'
+                };
+              });
               setAvailableModels(fetchedList);
-              setSelectedModel(fetchedList[0].id);
               setIsFetchingModels(false);
               return;
             }
           }
         } catch (err) {
-          console.warn("API modelleri çekilirken engel oluştu. Varsayılan Evren modelleri kullanılıyor.");
+          console.warn("API modelleri çekilirken engel oluştu. Tanımlı statik modeller kullanılıyor.");
         } finally {
           setIsFetchingModels(false);
         }
 
         setAvailableModels(DEFAULT_MODELS);
-        if (!selectedModel) setSelectedModel(DEFAULT_MODELS[0].id);
       };
 
       useEffect(() => {
@@ -244,7 +250,6 @@
         localStorage.setItem('evren_ai_settings', JSON.stringify(settings));
       }, [settings]);
 
-      // GÜVENLİ GİRİŞ / KAYIT HALE GETİRİLDİ (TRY...FINALLY EKLENDİ)
       const handleAuthSubmit = async (e) => {
         e.preventDefault();
         if (!emailInput.trim() || !passwordInput.trim()) {
@@ -399,7 +404,7 @@
             method: 'POST',
             headers,
             body: JSON.stringify({
-              model: selectedModel || 'evren-gpt-4o',
+              model: selectedModel || 'auto',
               messages: [
                 { role: 'system', content: settings.systemPrompt },
                 ...targetChat.messages.map(m => ({ role: m.role, content: m.content })),
@@ -429,7 +434,7 @@
             id: `msg-${Date.now() + 1}`,
             chat_id: currentChatId,
             role: 'assistant',
-            content: "⚠️ **Evren API Bağlantı Uyarısı:**\n\nSunucu yanıt vermedi. Sol alttaki **Ayarlar (⚙️)** simgesinden API sunucu adresinizi ve Key bilgilerinizi doğrulayın."
+            content: "⚠️ **Evren API Bağlantı Uyarısı:**\n\nSunucu yanıt vermedi. Sol alttaki **Ayarlar (⚙️)** simgesinden API sunucu adresinizi (`https://evren.ssyz.org.tr/llm`) ve Key bilgilerinizi doğrulayın."
           };
 
           setChats(prev => prev.map(c => c.id === currentChatId ? { ...c, messages: [...c.messages, mockAiMsg] } : c));
@@ -629,10 +634,11 @@
                     <span>{availableModels.find(m => m.id === selectedModel)?.name || selectedModel || 'Model Seçin'}</span>
                   </button>
                   {modelDropdownOpen && (
-                    <div className="absolute top-12 left-0 w-72 bg-slate-900 border border-slate-800 rounded-2xl p-2 z-50 shadow-2xl">
+                    <div className="absolute top-12 left-0 w-80 bg-slate-900 border border-slate-800 rounded-2xl p-2 z-50 shadow-2xl space-y-1">
                       {availableModels.map(m => (
-                        <button key={m.id} onClick={() => { setSelectedModel(m.id); setModelDropdownOpen(false); }} className="w-full text-left px-3 py-2 rounded-xl text-xs hover:bg-slate-800 text-slate-200">
-                          {m.name}
+                        <button key={m.id} onClick={() => { setSelectedModel(m.id); setModelDropdownOpen(false); }} className={`w-full text-left px-3 py-2 rounded-xl text-xs flex flex-col transition ${selectedModel === m.id ? 'bg-indigo-600/30 text-white' : 'hover:bg-slate-800 text-slate-300'}`}>
+                          <span className="font-semibold text-white">{m.name}</span>
+                          {m.desc && <span className="text-[10px] text-slate-400 mt-0.5">{m.desc}</span>}
                         </button>
                       ))}
                     </div>
