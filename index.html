@@ -27,10 +27,9 @@
     // ==========================================
     // SUPABASE BİLGİLERİNİZİ BURAYA YAZIN
     // ==========================================
-    const SUPABASE_URL = "https://vkpfnopdpdseasqnrzan.supabase.co"; 
-    const SUPABASE_ANON_KEY = "sb_publishable_OebKjfLIZKQY2tpHlo8Bjg_1awC229-";                  
+    const SUPABASE_URL = "https://sizin-proje-id.supabase.co"; 
+    const SUPABASE_ANON_KEY = "eyJhbGciOi...";                  
 
-    // Supabase istemcisini başlatma
     const supabaseClient = (SUPABASE_URL.includes("sizin-proje-id") || !window.supabase) 
       ? null 
       : window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -132,10 +131,14 @@
       const [emailInput, setEmailInput] = useState('');
       const [passwordInput, setPasswordInput] = useState('');
 
+      const [chats, setChats] = useState([]);
+      const [activeChatId, setActiveChatId] = useState(null);
+
+      // GÜNCEL EVREN API BASE URL
       const [settings, setSettings] = useState(() => {
         const saved = localStorage.getItem('evren_ai_settings');
         return saved ? JSON.parse(saved) : {
-          baseUrl: 'https://api.evrensitesi.com/v1',
+          baseUrl: 'https://evren.ssyz.org.tr/llm',
           apiKey: '',
           systemPrompt: 'Sen Eren Şenel tarafından geliştirilen Evren AI platformunda çalışan zeki, yardımsever ve profesyonel bir yapay zeka asistanısın.',
           temperature: 0.7,
@@ -143,22 +146,99 @@
         };
       });
 
+      const [availableModels, setAvailableModels] = useState([]);
+      const [selectedModel, setSelectedModel] = useState('');
+      const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
+      const [isFetchingModels, setIsFetchingModels] = useState(false);
+
+      // https://evren.ssyz.org.tr/llm/models ENDPOINT'İNDEN MODELLERİ ÇEKME
+      const handleFetchModelsFromApi = async () => {
+        setIsFetchingModels(true);
+        try {
+          const headers = { 'Content-Type': 'application/json' };
+          if (settings.apiKey) {
+            headers['Authorization'] = `Bearer ${settings.apiKey}`;
+          }
+
+          const response = await fetch(`${settings.baseUrl}/models`, { method: 'GET', headers });
+          if (!response.ok) throw new Error('API bağlantısı kurulamadı');
+          const data = await response.json();
+          
+          let rawList = [];
+          if (Array.isArray(data)) {
+            rawList = data;
+          } else if (data && Array.isArray(data.data)) {
+            rawList = data.data;
+          }
+
+          if (rawList.length > 0) {
+            const fetchedList = rawList.map(m => {
+              const modelId = typeof m === 'string' ? m : (m.id || m.name);
+              return { id: modelId, name: modelId, provider: 'Evren API' };
+            });
+
+            setAvailableModels(fetchedList);
+            if (fetchedList.length > 0 && !selectedModel) {
+              setSelectedModel(fetchedList[0].id);
+            }
+          }
+        } catch (error) {
+          console.warn("Modeller çekilirken hata oluştu:", error);
+        } finally {
+          setIsFetchingModels(false);
+        }
+      };
+
+      // UYGULAMA VEYA SİTE YÜKLENDİĞİNDE OTOMATİK MODELLERİ ÇEK
+      useEffect(() => {
+        handleFetchModelsFromApi();
+      }, [settings.baseUrl]);
+
+      // KULLANICI SOHBETLERİNİ VERİTABANINDAN ÇEKME
+      const loadUserChats = async (userId) => {
+        if (!supabaseClient || !userId) return;
+        try {
+          const { data, error } = await supabaseClient
+            .from('chats')
+            .select('*, messages(*)')
+            .eq('user_id', userId)
+            .order('updated_at', { ascending: false });
+
+          if (!error && data) {
+            const formatted = data.map(c => ({
+              ...c,
+              messages: (c.messages || []).sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+            }));
+            setChats(formatted);
+            if (formatted.length > 0) setActiveChatId(formatted[0].id);
+          }
+        } catch (err) {
+          console.error("Sohbetler yüklenemedi:", err);
+        }
+      };
+
       useEffect(() => {
         if (supabaseClient) {
+          const hash = window.location.hash;
+          if (hash.includes("error_code") || hash.includes("error=")) {
+            const errorDescription = new URLSearchParams(hash.substring(1)).get("error_description") || "Oturum bağlantısı geçersiz.";
+            window.location.href = "oturumbasarisiz.html?error=" + encodeURIComponent(errorDescription);
+            return;
+          }
+
           supabaseClient.auth.getSession().then(({ data: { session } }) => {
-            setUser(session?.user ?? null);
+            const currentUser = session?.user ?? null;
+            setUser(currentUser);
+            if (currentUser) loadUserChats(currentUser.id);
           });
 
           const { data: { subscription } } = supabaseClient.auth.onAuthStateChange((_event, session) => {
-            setUser(session?.user ?? null);
+            const currentUser = session?.user ?? null;
+            setUser(currentUser);
+            if (currentUser) loadUserChats(currentUser.id);
           });
 
           return () => subscription.unsubscribe();
-        } else {
-          const savedUser = localStorage.getItem('evren_ai_user_email');
-          if (savedUser && localStorage.getItem('evren_ai_logged_in') === 'true') {
-            setUser({ email: savedUser });
-          }
         }
       }, []);
 
@@ -177,15 +257,15 @@
 
         if (supabaseClient) {
           if (isRegistering) {
-            const { data, error } = await supabaseClient.auth.signUp({
+            const { error } = await supabaseClient.auth.signUp({
               email: emailInput.trim(),
               password: passwordInput.trim(),
             });
             setLoadingAuth(false);
             if (error) {
-              alert('Kayıt Hatası: ' + error.message);
+              window.location.href = "oturumbasarisiz.html?error=" + encodeURIComponent(error.message);
             } else {
-              alert('Kayıt başarılı! Giriş yapabilirsiniz.');
+              alert('Kayıt başarılı! Lütfen e-postanıza gelen onay bağlantısına tıklayın.');
               setIsRegistering(false);
             }
           } else {
@@ -195,23 +275,19 @@
             });
             setLoadingAuth(false);
             if (error) {
-              alert('Giriş Hatası: ' + error.message);
+              window.location.href = "oturumbasarisiz.html?error=" + encodeURIComponent(error.message);
+            } else {
+              setUser(data.user);
+              loadUserChats(data.user.id);
             }
           }
-        } else {
-          localStorage.setItem('evren_ai_user_email', emailInput.trim());
-          localStorage.setItem('evren_ai_logged_in', 'true');
-          setUser({ email: emailInput.trim() });
-          setLoadingAuth(false);
         }
       };
 
       const handleLogout = async () => {
-        if (supabaseClient) {
-          await supabaseClient.auth.signOut();
-        }
-        localStorage.removeItem('evren_ai_logged_in');
+        if (supabaseClient) await supabaseClient.auth.signOut();
         setUser(null);
+        setChats([]);
       };
 
       const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -222,35 +298,6 @@
       const [isGenerating, setIsGenerating] = useState(false);
       const [activeArtifact, setActiveArtifact] = useState(null);
 
-      const [availableModels, setAvailableModels] = useState([
-        { id: 'evren-gpt-4o', name: 'Evren GPT-4o (Önerilen)', provider: 'Evren API' },
-        { id: 'evren-claude-3-5-sonnet', name: 'Evren Claude 3.5 Sonnet', provider: 'Evren API' },
-        { id: 'evren-deepseek-r1', name: 'Evren DeepSeek-R1', provider: 'Evren API' },
-      ]);
-
-      const [selectedModel, setSelectedModel] = useState('evren-gpt-4o');
-      const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
-      const [isFetchingModels, setIsFetchingModels] = useState(false);
-
-      const [chats, setChats] = useState([
-        {
-          id: 'demo-1',
-          title: 'Evren AI Platformuna Hoş Geldiniz',
-          folder: 'Projeler',
-          pinned: true,
-          updatedAt: 'Şimdi',
-          messages: [
-            { id: 1, role: 'user', content: 'Sistem nasıl çalışıyor?' },
-            {
-              id: 2,
-              role: 'assistant',
-              content: 'Başarıyla giriş yaptınız! Hesabınız aktif durumda. Sol alttaki **Ayarlar (⚙️)** simgesinden API sunucu adresinizi ve anahtarınızı tanımlayabilir, sohbetlerinizi yönetebilirsiniz.'
-            }
-          ]
-        }
-      ]);
-
-      const [activeChatId, setActiveChatId] = useState('demo-1');
       const activeChat = chats.find(c => c.id === activeChatId) || null;
       const messagesEndRef = useRef(null);
       const fileInputRef = useRef(null);
@@ -259,38 +306,35 @@
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
       }, [activeChat?.messages, isGenerating]);
 
-      const handleFetchModelsFromApi = async () => {
-        setIsFetchingModels(true);
-        try {
-          const response = await fetch(`${settings.baseUrl}/models`, {
-            method: 'GET',
-            headers: { 'Authorization': `Bearer ${settings.apiKey}`, 'Content-Type': 'application/json' }
-          });
-          if (!response.ok) throw new Error('Hata');
-          const data = await response.json();
-          if (data && data.data && Array.isArray(data.data)) {
-            const fetchedList = data.data.map(m => ({ id: m.id, name: m.id, provider: 'Evren API' }));
-            setAvailableModels(fetchedList);
-            if (fetchedList.length > 0) setSelectedModel(fetchedList[0].id);
-          }
-        } catch (error) {
-          console.warn("Modeller çekilemedi.");
-        } finally {
-          setIsFetchingModels(false);
+      const handleNewChat = async () => {
+        const newId = `chat-${Date.now()}`;
+        const newChatObj = { id: newId, user_id: user.id, title: 'Yeni Sohbet', folder: 'Genel', pinned: false, messages: [] };
+
+        setChats(prev => [newChatObj, ...prev]);
+        setActiveChatId(newId);
+        setActiveArtifact(null);
+
+        if (supabaseClient && user?.id) {
+          await supabaseClient.from('chats').insert([{
+            id: newId,
+            user_id: user.id,
+            title: 'Yeni Sohbet',
+            folder: 'Genel',
+            pinned: false
+          }]);
         }
       };
 
-      const handleNewChat = () => {
-        const newId = `chat-${Date.now()}`;
-        const newChatObj = { id: newId, title: 'Yeni Sohbet', folder: 'Genel', pinned: false, updatedAt: 'Şimdi', messages: [] };
-        setChats([newChatObj, ...chats]);
-        setActiveChatId(newId);
-        setActiveArtifact(null);
-      };
-
-      const togglePin = (chatId, e) => {
+      const togglePin = async (chatId, e) => {
         e.stopPropagation();
-        setChats(chats.map(c => c.id === chatId ? { ...c, pinned: !c.pinned } : c));
+        const target = chats.find(c => c.id === chatId);
+        if (!target) return;
+        const newPinned = !target.pinned;
+        setChats(chats.map(c => c.id === chatId ? { ...c, pinned: newPinned } : c));
+
+        if (supabaseClient) {
+          await supabaseClient.from('chats').update({ pinned: newPinned }).eq('id', chatId);
+        }
       };
 
       const handleFileUpload = (e) => {
@@ -306,31 +350,52 @@
         let currentChatId = activeChatId;
         let targetChat = activeChat;
 
-        if (!targetChat || targetChat.messages.length === 0) {
+        if (!targetChat) {
+          currentChatId = `chat-${Date.now()}`;
           const newTitle = text.slice(0, 30) || 'Yeni Sohbet';
-          if (!targetChat) {
-            currentChatId = `chat-${Date.now()}`;
-            targetChat = { id: currentChatId, title: newTitle, folder: 'Genel', pinned: false, updatedAt: 'Şimdi', messages: [] };
-            setChats(prev => [targetChat, ...prev]);
-            setActiveChatId(currentChatId);
-          } else {
-            setChats(prev => prev.map(c => c.id === currentChatId ? { ...c, title: newTitle } : c));
+          targetChat = { id: currentChatId, user_id: user.id, title: newTitle, folder: 'Genel', pinned: false, messages: [] };
+
+          setChats(prev => [targetChat, ...prev]);
+          setActiveChatId(currentChatId);
+
+          if (supabaseClient && user?.id) {
+            await supabaseClient.from('chats').insert([{
+              id: currentChatId,
+              user_id: user.id,
+              title: newTitle
+            }]);
+          }
+        } else if (targetChat.messages.length === 0) {
+          const newTitle = text.slice(0, 30) || 'Yeni Sohbet';
+          setChats(prev => prev.map(c => c.id === currentChatId ? { ...c, title: newTitle } : c));
+          if (supabaseClient) {
+            await supabaseClient.from('chats').update({ title: newTitle }).eq('id', currentChatId);
           }
         }
 
-        const newUserMsg = { id: Date.now(), role: 'user', content: text, files: [...attachedFiles] };
-        setChats(prev => prev.map(c => c.id === currentChatId ? { ...c, messages: [...c.messages, newUserMsg] } : c));
+        const userMsgId = `msg-${Date.now()}`;
+        const newUserMsg = { id: userMsgId, chat_id: currentChatId, role: 'user', content: text };
 
+        setChats(prev => prev.map(c => c.id === currentChatId ? { ...c, messages: [...c.messages, newUserMsg] } : c));
         setInputPrompt('');
         setAttachedFiles([]);
         setIsGenerating(true);
 
+        if (supabaseClient) {
+          await supabaseClient.from('messages').insert([newUserMsg]);
+        }
+
         try {
+          const headers = { 'Content-Type': 'application/json' };
+          if (settings.apiKey) {
+            headers['Authorization'] = `Bearer ${settings.apiKey}`;
+          }
+
           const response = await fetch(`${settings.baseUrl}/chat/completions`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${settings.apiKey}` },
+            headers,
             body: JSON.stringify({
-              model: selectedModel,
+              model: selectedModel || (availableModels[0]?.id || 'default'),
               messages: [
                 { role: 'system', content: settings.systemPrompt },
                 ...targetChat.messages.map(m => ({ role: m.role, content: m.content })),
@@ -344,22 +409,30 @@
           if (response.ok) {
             const data = await response.json();
             const aiText = data.choices[0]?.message?.content || 'Yanıt alınamadı.';
-            setChats(prev => prev.map(c => c.id === currentChatId ? {
-              ...c, messages: [...c.messages, { id: Date.now() + 1, role: 'assistant', content: aiText }]
-            } : c));
+            const aiMsgId = `msg-${Date.now() + 1}`;
+            const newAiMsg = { id: aiMsgId, chat_id: currentChatId, role: 'assistant', content: aiText };
+
+            setChats(prev => prev.map(c => c.id === currentChatId ? { ...c, messages: [...c.messages, newAiMsg] } : c));
+
+            if (supabaseClient) {
+              await supabaseClient.from('messages').insert([newAiMsg]);
+            }
           } else {
-            throw new Error('API Hatası');
+            throw new Error('Evren API Yanıt Vermedi');
           }
         } catch (err) {
-          setTimeout(() => {
-            const mockAiMsg = {
-              id: Date.now() + 1,
-              role: 'assistant',
-              content: "**Evren AI (" + selectedModel + "):**\n\nYanıtınız başarıyla işlendi. (API sunucunuza bağlandığınızda yanıtlar doğrudan modelinizden akacaktır)."
-            };
-            setChats(prev => prev.map(c => c.id === currentChatId ? { ...c, messages: [...c.messages, mockAiMsg] } : c));
-            setIsGenerating(false);
-          }, 800);
+          const mockAiMsg = {
+            id: `msg-${Date.now() + 1}`,
+            chat_id: currentChatId,
+            role: 'assistant',
+            content: "⚠️ **Evren API Bağlantı Hatası:**\n\n`https://evren.ssyz.org.tr/llm` sunucusuna ulaşılamadı veya yanıt alınamadı."
+          };
+
+          setChats(prev => prev.map(c => c.id === currentChatId ? { ...c, messages: [...c.messages, mockAiMsg] } : c));
+
+          if (supabaseClient) {
+            await supabaseClient.from('messages').insert([mockAiMsg]);
+          }
         } finally {
           setIsGenerating(false);
         }
@@ -549,21 +622,25 @@
                 <div className="relative">
                   <button onClick={() => setModelDropdownOpen(!modelDropdownOpen)} className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-sm font-medium">
                     <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-                    <span>{availableModels.find(m => m.id === selectedModel)?.name || selectedModel}</span>
+                    <span>{availableModels.find(m => m.id === selectedModel)?.name || selectedModel || 'Model Seçin'}</span>
                   </button>
                   {modelDropdownOpen && (
-                    <div className="absolute top-12 left-0 w-72 bg-slate-900 border border-slate-800 rounded-2xl p-2 z-50">
-                      {availableModels.map(m => (
-                        <button key={m.id} onClick={() => { setSelectedModel(m.id); setModelDropdownOpen(false); }} className="w-full text-left px-3 py-2 rounded-xl text-xs hover:bg-slate-800">
-                          {m.name}
-                        </button>
-                      ))}
+                    <div className="absolute top-12 left-0 w-72 bg-slate-900 border border-slate-800 rounded-2xl p-2 z-50 shadow-2xl">
+                      {availableModels.length === 0 ? (
+                        <div className="p-3 text-xs text-slate-400 text-center">Model bulunamadı</div>
+                      ) : (
+                        availableModels.map(m => (
+                          <button key={m.id} onClick={() => { setSelectedModel(m.id); setModelDropdownOpen(false); }} className="w-full text-left px-3 py-2 rounded-xl text-xs hover:bg-slate-800 text-slate-200">
+                            {m.name}
+                          </button>
+                        ))
+                      )}
                     </div>
                   )}
                 </div>
               </div>
-              <button onClick={handleFetchModelsFromApi} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 border border-slate-800 text-xs text-slate-300 rounded-xl">
-                <IconRefresh/> <span>{isFetchingModels ? 'Yükleniyor...' : "API'den Çek"}</span>
+              <button onClick={handleFetchModelsFromApi} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 border border-slate-800 text-xs text-slate-300 rounded-xl hover:bg-slate-800 transition">
+                <IconRefresh/> <span>{isFetchingModels ? 'Yükleniyor...' : "Modelleri Yenile"}</span>
               </button>
             </header>
 
@@ -602,7 +679,7 @@
                     <textarea
                       rows="1" value={inputPrompt} onChange={e => setInputPrompt(e.target.value)}
                       onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }}
-                      placeholder="Bir şeyler sorun..." className="flex-1 bg-transparent text-slate-100 text-sm focus:outline-none resize-none"
+                      placeholder="Evren AI'a bir şey sorun..." className="flex-1 bg-transparent text-slate-100 text-sm focus:outline-none resize-none"
                     />
                     <button onClick={() => handleSendMessage()} className="p-3 bg-indigo-600 text-white rounded-2xl"><IconSend/></button>
                   </div>
@@ -632,11 +709,11 @@
                 </div>
                 <div className="space-y-3 text-xs">
                   <div>
-                    <label className="block text-slate-300 font-semibold mb-1">Base URL</label>
+                    <label className="block text-slate-300 font-semibold mb-1">Base URL (Evren API Sunucusu)</label>
                     <input type="text" value={settings.baseUrl} onChange={e => setSettings({ ...settings, baseUrl: e.target.value })} className="w-full bg-slate-900 p-2.5 rounded-xl border border-slate-800 text-white" />
                   </div>
                   <div>
-                    <label className="block text-slate-300 font-semibold mb-1">Evren API Key</label>
+                    <label className="block text-slate-300 font-semibold mb-1">Evren API Key (Gerekliyse)</label>
                     <input type="password" placeholder="sk-evren-xxx" value={settings.apiKey} onChange={e => setSettings({ ...settings, apiKey: e.target.value })} className="w-full bg-slate-900 p-2.5 rounded-xl border border-slate-800 text-white" />
                   </div>
                 </div>
