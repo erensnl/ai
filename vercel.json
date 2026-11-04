@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/evren-api/:path*",
+      "destination": "/api/proxy?path=:path*"
+    }
+  ]
+}
