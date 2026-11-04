@@ -4,6 +4,7 @@
 //   /api/evren-api/chat/completions  -> https://evren-llmapi.ssyz.org.tr/v1/chat/completions
 
 const UPSTREAM = 'https://evren-llmapi.ssyz.org.tr/v1';
+const SERVER_API_KEY = process.env.EVREN_API_KEY;
 
 const isJsonContentType = (contentType) =>
   Boolean(contentType && /^(?:application|text)\/(?:[\w.-]+\+)?json\b/i.test(contentType));
@@ -22,7 +23,9 @@ module.exports = async function handler(req, res) {
 
   try {
     const headers = { 'Content-Type': 'application/json' };
-    if (req.headers.authorization) {
+    if (SERVER_API_KEY) {
+      headers['Authorization'] = `Bearer ${SERVER_API_KEY}`;
+    } else if (req.headers.authorization) {
       headers['Authorization'] = req.headers.authorization;
     }
 
