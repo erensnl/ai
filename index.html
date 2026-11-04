@@ -1,1 +1,733 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Evren AI Interface</title>
+  <!-- React & React DOM (cdnjs CDN) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <!-- Babel Standalone (cdnjs CDN) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Supabase JS Client (jsdelivr CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 9999px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #334155; }
+  </style>
+</head>
+<body class="bg-[#090d16] text-slate-100 font-sans antialiased">
+  <div id="root"></div>
 
+  <script type="text/babel">
+    // =========================================================================
+    // SUPABASE BİLGİLERİNİZİ BURAYA YAZIN (Dashboard > Settings > API)
+    // =========================================================================
+    const SUPABASE_URL = "https://sizin-proje-id.supabase.co"; 
+    const SUPABASE_ANON_KEY = "eyJhbGciOi...";                  
+
+    const supabaseClient = (SUPABASE_URL.includes("sizin-proje-id") || !window.supabase) 
+      ? null 
+      : window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    const { useState, useEffect, useRef } = React;
+
+    // --- İKON BİLEŞENLERİ ---
+    const IconSparkles = () => (
+      <svg className="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-6.857 2.286L11 21l-2.286-6.857L2 12l6.857-2.286L11 3z" />
+      </svg>
+    );
+
+    const IconPlus = () => (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+      </svg>
+    );
+
+    const IconPin = ({ pinned }) => (
+      <svg className={`w-4 h-4 ${pinned ? 'text-amber-400 fill-amber-400/20' : 'text-slate-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+      </svg>
+    );
+
+    const IconSearch = () => (
+      <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+      </svg>
+    );
+
+    const IconSettings = () => (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+      </svg>
+    );
+
+    const IconPaperclip = () => (
+      <svg className="w-5 h-5 text-slate-400 hover:text-slate-200 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+      </svg>
+    );
+
+    const IconSend = () => (
+      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+      </svg>
+    );
+
+    const IconCode = () => (
+      <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+      </svg>
+    );
+
+    const IconPlay = () => (
+      <svg className="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    );
+
+    const IconRefresh = () => (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+      </svg>
+    );
+
+    const IconX = () => (
+      <svg className="w-5 h-5 text-slate-400 hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+      </svg>
+    );
+
+    const IconLogout = () => (
+      <svg className="w-4 h-4 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+      </svg>
+    );
+
+    const IconMail = () => (
+      <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+      </svg>
+    );
+
+    const IconLock = () => (
+      <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+      </svg>
+    );
+
+    const DEFAULT_MODELS = [
+      { id: 'evren-gpt-4o', name: 'Evren GPT-4o', provider: 'Evren API' },
+      { id: 'evren-claude-3-5-sonnet', name: 'Evren Claude 3.5 Sonnet', provider: 'Evren API' },
+      { id: 'evren-deepseek-r1', name: 'Evren DeepSeek-R1', provider: 'Evren API' }
+    ];
+
+    function App() {
+      const [user, setUser] = useState(null);
+      const [isRegistering, setIsRegistering] = useState(false);
+      const [loadingAuth, setLoadingAuth] = useState(false);
+
+      const [emailInput, setEmailInput] = useState('');
+      const [passwordInput, setPasswordInput] = useState('');
+
+      const [chats, setChats] = useState([]);
+      const [activeChatId, setActiveChatId] = useState(null);
+
+      const [settings, setSettings] = useState(() => {
+        const saved = localStorage.getItem('evren_ai_settings');
+        return saved ? JSON.parse(saved) : {
+          baseUrl: 'https://evren-llmapi.ssyz.org.tr/v1',
+          apiKey: '',
+          systemPrompt: 'Sen Eren Şenel tarafından geliştirilen Evren AI platformunda çalışan zeki, yardımsever ve profesyonel bir yapay zeka asistanısın.',
+          temperature: 0.7,
+          maxTokens: 2048,
+        };
+      });
+
+      const [availableModels, setAvailableModels] = useState(DEFAULT_MODELS);
+      const [selectedModel, setSelectedModel] = useState('evren-gpt-4o');
+      const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
+      const [isFetchingModels, setIsFetchingModels] = useState(false);
+
+      // SESSİZ SÜRÜCÜ: CORS HATA ALINSA DAHİ UYGULAMAYI KİLİTLEMEZ
+      const handleFetchModelsFromApi = async () => {
+        setIsFetchingModels(true);
+        try {
+          const headers = { 'Content-Type': 'application/json' };
+          if (settings.apiKey) headers['Authorization'] = `Bearer ${settings.apiKey}`;
+
+          const res = await fetch(`${settings.baseUrl}/models`, { method: 'GET', headers });
+          if (res.ok) {
+            const data = await res.json();
+            let rawList = Array.isArray(data) ? data : (data.data || []);
+            if (rawList.length > 0) {
+              const fetchedList = rawList.map(m => ({
+                id: typeof m === 'string' ? m : (m.id || m.name),
+                name: typeof m === 'string' ? m : (m.id || m.name),
+                provider: 'Evren API'
+              }));
+              setAvailableModels(fetchedList);
+              setSelectedModel(fetchedList[0].id);
+              setIsFetchingModels(false);
+              return;
+            }
+          }
+        } catch (err) {
+          console.warn("API modelleri çekilirken engel oluştu. Varsayılan Evren modelleri kullanılıyor.");
+        } finally {
+          setIsFetchingModels(false);
+        }
+
+        setAvailableModels(DEFAULT_MODELS);
+        if (!selectedModel) setSelectedModel(DEFAULT_MODELS[0].id);
+      };
+
+      useEffect(() => {
+        handleFetchModelsFromApi();
+      }, [settings.baseUrl]);
+
+      const loadUserChats = async (userId) => {
+        if (!supabaseClient || !userId) return;
+        try {
+          const { data, error } = await supabaseClient
+            .from('chats')
+            .select('*, messages(*)')
+            .eq('user_id', userId)
+            .order('updated_at', { ascending: false });
+
+          if (!error && data) {
+            const formatted = data.map(c => ({
+              ...c,
+              messages: (c.messages || []).sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+            }));
+            setChats(formatted);
+            if (formatted.length > 0) setActiveChatId(formatted[0].id);
+          }
+        } catch (err) {
+          console.error("Sohbetler yüklenemedi:", err);
+        }
+      };
+
+      useEffect(() => {
+        if (supabaseClient) {
+          const hash = window.location.hash;
+          if (hash.includes("error_code") || hash.includes("error=")) {
+            const errorDescription = new URLSearchParams(hash.substring(1)).get("error_description") || "Oturum bağlantısı geçersiz.";
+            window.location.href = "oturumbasarisiz.html?error=" + encodeURIComponent(errorDescription);
+            return;
+          }
+
+          supabaseClient.auth.getSession().then(({ data: { session } }) => {
+            const currentUser = session?.user ?? null;
+            setUser(currentUser);
+            if (currentUser) loadUserChats(currentUser.id);
+          });
+
+          const { data: { subscription } } = supabaseClient.auth.onAuthStateChange((_event, session) => {
+            const currentUser = session?.user ?? null;
+            setUser(currentUser);
+            if (currentUser) loadUserChats(currentUser.id);
+          });
+
+          return () => subscription.unsubscribe();
+        }
+      }, []);
+
+      useEffect(() => {
+        localStorage.setItem('evren_ai_settings', JSON.stringify(settings));
+      }, [settings]);
+
+      // GÜVENLİ GİRİŞ / KAYIT HALE GETİRİLDİ (TRY...FINALLY EKLENDİ)
+      const handleAuthSubmit = async (e) => {
+        e.preventDefault();
+        if (!emailInput.trim() || !passwordInput.trim()) {
+          alert('Lütfen e-posta adresinizi ve şifrenizi girin!');
+          return;
+        }
+
+        if (!supabaseClient) {
+          alert("Lütfen index.html dosyasının en üstündeki SUPABASE_URL ve SUPABASE_ANON_KEY alanlarını kendi Supabase bilgilerinizle doldurun!");
+          return;
+        }
+
+        setLoadingAuth(true);
+
+        try {
+          if (isRegistering) {
+            const { error } = await supabaseClient.auth.signUp({
+              email: emailInput.trim(),
+              password: passwordInput.trim(),
+            });
+            if (error) {
+              window.location.href = "oturumbasarisiz.html?error=" + encodeURIComponent(error.message);
+            } else {
+              alert('Kayıt başarılı! Lütfen e-postanıza gelen onay bağlantısına tıklayın.');
+              setIsRegistering(false);
+            }
+          } else {
+            const { data, error } = await supabaseClient.auth.signInWithPassword({
+              email: emailInput.trim(),
+              password: passwordInput.trim(),
+            });
+            if (error) {
+              window.location.href = "oturumbasarisiz.html?error=" + encodeURIComponent(error.message);
+            } else {
+              setUser(data.user);
+              loadUserChats(data.user.id);
+            }
+          }
+        } catch (err) {
+          alert("İşlem sırasında bir hata oluştu: " + err.message);
+        } finally {
+          setLoadingAuth(false);
+        }
+      };
+
+      const handleLogout = async () => {
+        if (supabaseClient) await supabaseClient.auth.signOut();
+        setUser(null);
+        setChats([]);
+      };
+
+      const [sidebarOpen, setSidebarOpen] = useState(true);
+      const [searchQuery, setSearchQuery] = useState('');
+      const [inputPrompt, setInputPrompt] = useState('');
+      const [attachedFiles, setAttachedFiles] = useState([]);
+      const [showSettings, setShowSettings] = useState(false);
+      const [isGenerating, setIsGenerating] = useState(false);
+      const [activeArtifact, setActiveArtifact] = useState(null);
+
+      const activeChat = chats.find(c => c.id === activeChatId) || null;
+      const messagesEndRef = useRef(null);
+      const fileInputRef = useRef(null);
+
+      useEffect(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, [activeChat?.messages, isGenerating]);
+
+      const handleNewChat = async () => {
+        const newId = `chat-${Date.now()}`;
+        const newChatObj = { id: newId, user_id: user.id, title: 'Yeni Sohbet', folder: 'Genel', pinned: false, messages: [] };
+
+        setChats(prev => [newChatObj, ...prev]);
+        setActiveChatId(newId);
+        setActiveArtifact(null);
+
+        if (supabaseClient && user?.id) {
+          await supabaseClient.from('chats').insert([{
+            id: newId,
+            user_id: user.id,
+            title: 'Yeni Sohbet',
+            folder: 'Genel',
+            pinned: false
+          }]);
+        }
+      };
+
+      const togglePin = async (chatId, e) => {
+        e.stopPropagation();
+        const target = chats.find(c => c.id === chatId);
+        if (!target) return;
+        const newPinned = !target.pinned;
+        setChats(chats.map(c => c.id === chatId ? { ...c, pinned: newPinned } : c));
+
+        if (supabaseClient) {
+          await supabaseClient.from('chats').update({ pinned: newPinned }).eq('id', chatId);
+        }
+      };
+
+      const handleFileUpload = (e) => {
+        const files = Array.from(e.target.files);
+        if (!files.length) return;
+        setAttachedFiles(prev => [...prev, ...files.map(f => ({ name: f.name, size: (f.size / 1024).toFixed(1) + ' KB' }))]);
+      };
+
+      const handleSendMessage = async (promptToSend) => {
+        const text = promptToSend || inputPrompt;
+        if (!text.trim() && attachedFiles.length === 0) return;
+
+        let currentChatId = activeChatId;
+        let targetChat = activeChat;
+
+        if (!targetChat) {
+          currentChatId = `chat-${Date.now()}`;
+          const newTitle = text.slice(0, 30) || 'Yeni Sohbet';
+          targetChat = { id: currentChatId, user_id: user.id, title: newTitle, folder: 'Genel', pinned: false, messages: [] };
+
+          setChats(prev => [targetChat, ...prev]);
+          setActiveChatId(currentChatId);
+
+          if (supabaseClient && user?.id) {
+            await supabaseClient.from('chats').insert([{
+              id: currentChatId,
+              user_id: user.id,
+              title: newTitle
+            }]);
+          }
+        } else if (targetChat.messages.length === 0) {
+          const newTitle = text.slice(0, 30) || 'Yeni Sohbet';
+          setChats(prev => prev.map(c => c.id === currentChatId ? { ...c, title: newTitle } : c));
+          if (supabaseClient) {
+            await supabaseClient.from('chats').update({ title: newTitle }).eq('id', currentChatId);
+          }
+        }
+
+        const userMsgId = `msg-${Date.now()}`;
+        const newUserMsg = { id: userMsgId, chat_id: currentChatId, role: 'user', content: text };
+
+        setChats(prev => prev.map(c => c.id === currentChatId ? { ...c, messages: [...c.messages, newUserMsg] } : c));
+        setInputPrompt('');
+        setAttachedFiles([]);
+        setIsGenerating(true);
+
+        if (supabaseClient) {
+          await supabaseClient.from('messages').insert([newUserMsg]);
+        }
+
+        try {
+          const headers = { 'Content-Type': 'application/json' };
+          if (settings.apiKey) headers['Authorization'] = `Bearer ${settings.apiKey}`;
+
+          const response = await fetch(`${settings.baseUrl}/chat/completions`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              model: selectedModel || 'evren-gpt-4o',
+              messages: [
+                { role: 'system', content: settings.systemPrompt },
+                ...targetChat.messages.map(m => ({ role: m.role, content: m.content })),
+                { role: 'user', content: text }
+              ],
+              temperature: settings.temperature,
+              max_tokens: settings.maxTokens
+            })
+          });
+
+          if (response && response.ok) {
+            const data = await response.json();
+            const aiText = data.choices[0]?.message?.content || 'Yanıt alınamadı.';
+            const aiMsgId = `msg-${Date.now() + 1}`;
+            const newAiMsg = { id: aiMsgId, chat_id: currentChatId, role: 'assistant', content: aiText };
+
+            setChats(prev => prev.map(c => c.id === currentChatId ? { ...c, messages: [...c.messages, newAiMsg] } : c));
+
+            if (supabaseClient) {
+              await supabaseClient.from('messages').insert([newAiMsg]);
+            }
+          } else {
+            throw new Error('API Yanıt Vermedi');
+          }
+        } catch (err) {
+          const mockAiMsg = {
+            id: `msg-${Date.now() + 1}`,
+            chat_id: currentChatId,
+            role: 'assistant',
+            content: "⚠️ **Evren API Bağlantı Uyarısı:**\n\nSunucu yanıt vermedi. Sol alttaki **Ayarlar (⚙️)** simgesinden API sunucu adresinizi ve Key bilgilerinizi doğrulayın."
+          };
+
+          setChats(prev => prev.map(c => c.id === currentChatId ? { ...c, messages: [...c.messages, mockAiMsg] } : c));
+
+          if (supabaseClient) {
+            await supabaseClient.from('messages').insert([mockAiMsg]);
+          }
+        } finally {
+          setIsGenerating(false);
+        }
+      };
+
+      const renderMessageContent = (content) => {
+        const parts = content.split(/(```[\s\S]*?```)/g);
+        return parts.map((part, index) => {
+          if (part.startsWith('```')) {
+            const firstLineEnd = part.indexOf('\n');
+            const language = part.slice(3, firstLineEnd).trim() || 'code';
+            const codeText = part.slice(firstLineEnd + 1, -3).trim();
+            const isPreviewable = ['html', 'javascript', 'js', 'svg', 'css'].includes(language.toLowerCase());
+
+            return (
+              <div key={index} className="my-4 rounded-xl border border-slate-800 bg-slate-950 overflow-hidden shadow-lg">
+                <div className="flex items-center justify-between px-4 py-2 bg-slate-900 border-b border-slate-800 text-xs">
+                  <span className="font-mono text-indigo-400 font-semibold uppercase">{language}</span>
+                  <div className="flex items-center gap-2">
+                    {isPreviewable && (
+                      <button
+                        onClick={() => setActiveArtifact({ language, code: codeText })}
+                        className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-xs font-medium"
+                      >
+                        <IconPlay/> <span>Ön İzlemeyi Aç</span>
+                      </button>
+                    )}
+                    <button
+                      onClick={() => navigator.clipboard.writeText(codeText)}
+                      className="px-2.5 py-1 rounded bg-slate-800 text-slate-300 hover:bg-slate-700 text-xs"
+                    >
+                      Kodu Kopyala
+                    </button>
+                  </div>
+                </div>
+                <pre className="p-4 overflow-x-auto text-sm font-mono text-slate-200"><code>{codeText}</code></pre>
+              </div>
+            );
+          }
+          return (
+            <div key={index} className="whitespace-pre-wrap leading-relaxed text-slate-200 text-sm md:text-base">
+              {part.split('\n').map((line, i) => (
+                <span key={i}>{line}<br /></span>
+              ))}
+            </div>
+          );
+        });
+      };
+
+      const filteredChats = chats.filter(c => c.title.toLowerCase().includes(searchQuery.toLowerCase()));
+
+      if (!user) {
+        return (
+          <div className="min-h-screen bg-[#090d16] flex items-center justify-center p-4 relative overflow-hidden font-sans">
+            <div className="absolute w-[500px] h-[500px] bg-indigo-600/15 rounded-full blur-3xl -top-32 -left-32 pointer-events-none"></div>
+            <div className="absolute w-[500px] h-[500px] bg-pink-600/15 rounded-full blur-3xl -bottom-32 -right-32 pointer-events-none"></div>
+
+            <div className="max-w-md w-full bg-[#0f1523]/90 backdrop-blur-2xl border border-slate-800/80 rounded-3xl p-8 shadow-2xl relative z-10">
+              <div className="flex flex-col items-center text-center mb-8">
+                <div className="w-16 h-16 rounded-3xl bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center mb-4 shadow-xl shadow-indigo-500/20">
+                  <IconSparkles/>
+                </div>
+                <h1 className="text-2xl font-extrabold text-white tracking-tight">EVREN AI PORTAL</h1>
+                <p className="text-slate-400 text-xs mt-1.5">
+                  {isRegistering ? 'Yeni bir hesap oluşturun' : 'Devam etmek için hesabınıza giriş yapın'}
+                </p>
+              </div>
+
+              <form onSubmit={handleAuthSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1.5 uppercase tracking-wider">
+                    E-posta Adresi
+                  </label>
+                  <div className="relative flex items-center">
+                    <span className="absolute left-3.5"><IconMail/></span>
+                    <input
+                      type="email"
+                      required
+                      value={emailInput}
+                      onChange={e => setEmailInput(e.target.value)}
+                      placeholder="eposta@evren.com"
+                      className="w-full bg-slate-900/90 border border-slate-800 rounded-xl py-3 pl-11 pr-4 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1.5 uppercase tracking-wider">
+                    Şifre
+                  </label>
+                  <div className="relative flex items-center">
+                    <span className="absolute left-3.5"><IconLock/></span>
+                    <input
+                      type="password"
+                      required
+                      value={passwordInput}
+                      onChange={e => setPasswordInput(e.target.value)}
+                      placeholder="••••••••"
+                      className="w-full bg-slate-900/90 border border-slate-800 rounded-xl py-3 pl-11 pr-4 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loadingAuth}
+                  className="w-full py-3.5 px-4 bg-gradient-to-r from-indigo-600 via-indigo-500 to-pink-500 hover:opacity-95 text-white font-semibold rounded-xl transition shadow-lg shadow-indigo-600/25 active:scale-[0.98] mt-2 disabled:opacity-50"
+                >
+                  {loadingAuth ? 'İşleniyor...' : (isRegistering ? 'Kayıt Ol' : 'Giriş Yap')}
+                </button>
+              </form>
+
+              <div className="mt-6 pt-6 border-t border-slate-800/80 text-center text-xs text-slate-400">
+                {isRegistering ? (
+                  <span>Zaten hesabınız var mı? <button onClick={() => setIsRegistering(false)} className="text-indigo-400 font-semibold hover:underline">Giriş Yapın</button></span>
+                ) : (
+                  <span>Hesabınız yok mu? <button onClick={() => setIsRegistering(true)} className="text-indigo-400 font-semibold hover:underline">Hemen Kayıt Olun</button></span>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      return (
+        <div className="flex h-screen bg-[#090d16] text-slate-100 font-sans overflow-hidden">
+          {/* SIDEBAR */}
+          <aside className={`${sidebarOpen ? 'w-72 md:w-80' : 'w-0'} transition-all duration-300 bg-[#0f1523] border-r border-slate-800/80 flex flex-col z-20 relative overflow-hidden`}>
+            <div className="p-4 border-b border-slate-800/60 flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-500 to-pink-500 flex items-center justify-center">
+                    <IconSparkles/>
+                  </div>
+                  <span className="font-bold text-base text-white">EVREN AI INTERFACE</span>
+                </div>
+              </div>
+              <button onClick={handleNewChat} className="flex items-center justify-center gap-2 w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-medium transition">
+                <IconPlus/> <span>Yeni Sohbet</span>
+              </button>
+            </div>
+
+            <div className="px-4 py-3">
+              <div className="relative">
+                <span className="absolute inset-y-0 left-3 flex items-center"><IconSearch/></span>
+                <input
+                  type="text" placeholder="Sohbetlerde ara..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+                  className="w-full bg-slate-900 text-sm text-slate-200 pl-9 pr-3 py-2 rounded-xl border border-slate-800 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-3 py-2 space-y-2 custom-scrollbar">
+              {filteredChats.map(chat => (
+                <div
+                  key={chat.id} onClick={() => setActiveChatId(chat.id)}
+                  className={`flex items-center justify-between px-3 py-2.5 rounded-xl cursor-pointer text-sm ${activeChatId === chat.id ? 'bg-indigo-600/20 border border-indigo-500/30 text-white font-medium' : 'text-slate-300 hover:bg-slate-800/60'}`}
+                >
+                  <span className="truncate">{chat.title}</span>
+                  <button onClick={e => togglePin(chat.id, e)}><IconPin pinned="{chat.pinned}"/></button>
+                </div>
+              ))}
+            </div>
+
+            <div className="p-3 border-t border-slate-800 bg-slate-900/50 flex items-center justify-between">
+              <div className="flex items-center gap-2 overflow-hidden">
+                <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center font-bold text-xs shrink-0">
+                  {user.email ? user.email.substring(0, 2).toUpperCase() : 'EŞ'}
+                </div>
+                <div className="flex flex-col truncate">
+                  <span className="text-xs font-medium text-white truncate">{user.email}</span>
+                  <span className="text-[10px] text-emerald-400">● Oturum Açık</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                <button onClick={() => setShowSettings(true)} className="p-2 text-slate-400 hover:text-white" title="API Ayarları"><IconSettings/></button>
+                <button onClick={handleLogout} className="p-2 text-slate-400 hover:text-rose-400" title="Çıkış Yap"><IconLogout/></button>
+              </div>
+            </div>
+          </aside>
+
+          {/* MAIN CONTENT */}
+          <main className="flex-1 flex flex-col h-full relative overflow-hidden">
+            <header className="h-16 border-b border-slate-800/80 bg-[#0f1523]/80 px-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                {!sidebarOpen && <button onClick={() => setSidebarOpen(true)} className="p-2 text-slate-400 hover:text-white"><IconSparkles/></button>}
+                <div className="relative">
+                  <button onClick={() => setModelDropdownOpen(!modelDropdownOpen)} className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-sm font-medium">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                    <span>{availableModels.find(m => m.id === selectedModel)?.name || selectedModel || 'Model Seçin'}</span>
+                  </button>
+                  {modelDropdownOpen && (
+                    <div className="absolute top-12 left-0 w-72 bg-slate-900 border border-slate-800 rounded-2xl p-2 z-50 shadow-2xl">
+                      {availableModels.map(m => (
+                        <button key={m.id} onClick={() => { setSelectedModel(m.id); setModelDropdownOpen(false); }} className="w-full text-left px-3 py-2 rounded-xl text-xs hover:bg-slate-800 text-slate-200">
+                          {m.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <button onClick={handleFetchModelsFromApi} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 border border-slate-800 text-xs text-slate-300 rounded-xl hover:bg-slate-800 transition">
+                <IconRefresh/> <span>{isFetchingModels ? 'Yükleniyor...' : "Modelleri Yenile"}</span>
+              </button>
+            </header>
+
+            <div className="flex-1 flex overflow-hidden">
+              <div className="flex-1 flex flex-col h-full overflow-hidden">
+                <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 custom-scrollbar">
+                  {!activeChat || activeChat.messages.length === 0 ? (
+                    <div className="h-full flex flex-col items-center justify-center text-center space-y-6 py-12">
+                      <div className="w-16 h-16 rounded-3xl bg-indigo-600 flex items-center justify-center shadow-2xl"><IconSparkles/></div>
+                      <h1 className="text-3xl font-bold text-white">Evren AI Modeline Hoş Geldiniz</h1>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-xl w-full">
+                        {['React Tailwind Dashboard Yap', 'Python Web Scraper Yaz', 'API Performans Analizi', 'Sistem Prompt Özelleştirme'].map((t, idx) => (
+                          <button key={idx} onClick={() => handleSendMessage(t)} className="p-4 rounded-2xl bg-slate-900 border border-slate-800 text-left hover:border-indigo-500 text-sm text-slate-300">
+                            {t}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    activeChat.messages.map(msg => (
+                      <div key={msg.id} className={`flex gap-4 max-w-4xl mx-auto ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                        {msg.role === 'assistant' && <div className="w-9 h-9 rounded-2xl bg-indigo-600 flex items-center justify-center text-white shrink-0"><IconSparkles/></div>}
+                        <div className={`rounded-2xl p-5 max-w-[80%] ${msg.role === 'user' ? 'bg-indigo-600 text-white' : 'bg-[#0f1523] border border-slate-800 text-slate-200'}`}>
+                          {renderMessageContent(msg.content)}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                  <div ref={messagesEndRef} />
+                </div>
+
+                <div className="p-4 bg-[#090d16] border-t border-slate-800">
+                  <div className="max-w-4xl mx-auto bg-slate-900 border border-slate-800 rounded-3xl p-3 flex items-center gap-2">
+                    <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
+                    <button onClick={() => fileInputRef.current?.click()} className="p-2 text-slate-400 hover:text-white"><IconPaperclip/></button>
+                    <textarea
+                      rows="1" value={inputPrompt} onChange={e => setInputPrompt(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }}
+                      placeholder="Evren AI'a bir şey sorun..." className="flex-1 bg-transparent text-slate-100 text-sm focus:outline-none resize-none"
+                    />
+                    <button onClick={() => handleSendMessage()} className="p-3 bg-indigo-600 text-white rounded-2xl"><IconSend/></button>
+                  </div>
+                </div>
+              </div>
+
+              {activeArtifact && (
+                <div className="w-[500px] border-l border-slate-800 bg-[#0c101d] flex flex-col h-full">
+                  <div className="h-14 px-4 border-b border-slate-800 flex items-center justify-between">
+                    <div className="flex items-center gap-2"><IconCode/><span className="text-sm font-semibold text-white">Canlı Kod Ön İzleme</span></div>
+                    <button onClick={() => setActiveArtifact(null)} className="p-1 text-slate-400 hover:text-white"><IconX/></button>
+                  </div>
+                  <div className="flex-1 bg-slate-950">
+                    <iframe title="Artifact Preview" srcDoc={activeArtifact.code} className="w-full h-full bg-white" sandbox="allow-scripts" />
+                  </div>
+                </div>
+              )}
+            </div>
+          </main>
+
+          {showSettings && (
+            <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+              <div className="bg-[#0f1523] border border-slate-800 rounded-3xl max-w-lg w-full p-6 space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <h3 className="font-bold text-white">Evren API Ayarları</h3>
+                  <button onClick={() => setShowSettings(false)} className="text-slate-400 hover:text-white"><IconX/></button>
+                </div>
+                <div className="space-y-3 text-xs">
+                  <div>
+                    <label className="block text-slate-300 font-semibold mb-1">Base URL (Evren API Sunucusu)</label>
+                    <input type="text" value={settings.baseUrl} onChange={e => setSettings({ ...settings, baseUrl: e.target.value })} className="w-full bg-slate-900 p-2.5 rounded-xl border border-slate-800 text-white" />
+                  </div>
+                  <div>
+                    <label className="block text-slate-300 font-semibold mb-1">Evren API Key (Gerekliyse)</label>
+                    <input type="password" placeholder="sk-evren-xxx" value={settings.apiKey} onChange={e => setSettings({ ...settings, apiKey: e.target.value })} className="w-full bg-slate-900 p-2.5 rounded-xl border border-slate-800 text-white" />
+                  </div>
+                </div>
+                <div className="flex justify-end pt-3">
+                  <button onClick={() => setShowSettings(false)} className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-medium">Kaydet</button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+  </script>
+</body>
+</html>
