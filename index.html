@@ -755,6 +755,7 @@ function App() {
     setIsGenerating(true);
     const startedAt = performance.now();
     abortControllerRef.current = new AbortController();
+    const streamedMessageId = `msg-${Date.now() + 1}`;
 
     if (supabaseClient) {
       await supabaseClient.from('messages').insert([newUserMsg]);
@@ -800,6 +801,16 @@ function App() {
                 const chunk = JSON.parse(payload);
                 aiText += chunk.choices?.[0]?.delta?.content || '';
                 if (chunk.usage) setLastUsage(chunk.usage);
+                if (aiText) {
+                  setChats(current => current.map(chat => {
+                    if (chat.id !== currentChatId) return chat;
+                    const existing = chat.messages.some(message => message.id === streamedMessageId);
+                    const streamedMessage = { id: streamedMessageId, chat_id: currentChatId, role: 'assistant', content: aiText };
+                    return { ...chat, messages: existing
+                      ? chat.messages.map(message => message.id === streamedMessageId ? streamedMessage : message)
+                      : [...chat.messages, streamedMessage] };
+                  }));
+                }
               } catch (e) {}
             }
             if (done) break;
@@ -837,10 +848,16 @@ function App() {
             aiText += `\n\n**Karşılaştırma kullanılamadı:** ${comparisonError.message}`;
           }
         }
-        const aiMsgId = `msg-${Date.now() + 1}`;
+        const aiMsgId = streamedMessageId;
         const newAiMsg = { id: aiMsgId, chat_id: currentChatId, role: 'assistant', content: aiText };
 
-        setChats(prev => prev.map(c => c.id === currentChatId ? { ...c, messages: [...c.messages, newAiMsg] } : c));
+        setChats(prev => prev.map(c => {
+          if (c.id !== currentChatId) return c;
+          const exists = c.messages.some(message => message.id === aiMsgId);
+          return { ...c, messages: exists
+            ? c.messages.map(message => message.id === aiMsgId ? newAiMsg : message)
+            : [...c.messages, newAiMsg] };
+        }));
 
         if (supabaseClient) {
           await supabaseClient.from('messages').insert([newAiMsg]);
