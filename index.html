@@ -123,6 +123,12 @@
       </svg>
     );
 
+    const DEFAULT_MODELS = [
+      { id: 'evren-gpt-4o', name: 'Evren GPT-4o', provider: 'Evren API' },
+      { id: 'evren-claude-3-5-sonnet', name: 'Evren Claude 3.5 Sonnet', provider: 'Evren API' },
+      { id: 'evren-deepseek-r1', name: 'Evren DeepSeek-R1', provider: 'Evren API' }
+    ];
+
     function App() {
       const [user, setUser] = useState(null);
       const [isRegistering, setIsRegistering] = useState(false);
@@ -134,11 +140,10 @@
       const [chats, setChats] = useState([]);
       const [activeChatId, setActiveChatId] = useState(null);
 
-      // GÜNCEL EVREN API BASE URL
       const [settings, setSettings] = useState(() => {
         const saved = localStorage.getItem('evren_ai_settings');
         return saved ? JSON.parse(saved) : {
-          baseUrl: 'https://evren.ssyz.org.tr/llm',
+          baseUrl: 'https://evren-llmapi.ssyz.org.tr/v1',
           apiKey: '',
           systemPrompt: 'Sen Eren Şenel tarafından geliştirilen Evren AI platformunda çalışan zeki, yardımsever ve profesyonel bir yapay zeka asistanısın.',
           temperature: 0.7,
@@ -146,55 +151,62 @@
         };
       });
 
-      const [availableModels, setAvailableModels] = useState([]);
-      const [selectedModel, setSelectedModel] = useState('');
+      const [availableModels, setAvailableModels] = useState(DEFAULT_MODELS);
+      const [selectedModel, setSelectedModel] = useState('evren-gpt-4o');
       const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
       const [isFetchingModels, setIsFetchingModels] = useState(false);
 
-      // https://evren.ssyz.org.tr/llm/models ENDPOINT'İNDEN MODELLERİ ÇEKME
+      // CORS UYUMLU MODEL ÇEKME FONKSİYONU
       const handleFetchModelsFromApi = async () => {
         setIsFetchingModels(true);
+        let data = null;
+
+        const headers = { 'Content-Type': 'application/json' };
+        if (settings.apiKey) headers['Authorization'] = `Bearer ${settings.apiKey}`;
+
+        // 1. Doğrudan Istek
         try {
-          const headers = { 'Content-Type': 'application/json' };
-          if (settings.apiKey) {
-            headers['Authorization'] = `Bearer ${settings.apiKey}`;
-          }
+          const res = await fetch(`${settings.baseUrl}/models`, { method: 'GET', headers });
+          if (res.ok) data = await res.json();
+        } catch (err) {
+          console.warn("Doğrudan istek CORS engeline takıldı, proxy deneniyor...");
+        }
 
-          const response = await fetch(`${settings.baseUrl}/models`, { method: 'GET', headers });
-          if (!response.ok) throw new Error('API bağlantısı kurulamadı');
-          const data = await response.json();
-          
-          let rawList = [];
-          if (Array.isArray(data)) {
-            rawList = data;
-          } else if (data && Array.isArray(data.data)) {
-            rawList = data.data;
+        // 2. CORS Proxy Istegi
+        if (!data) {
+          try {
+            const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(settings.baseUrl + '/models')}`;
+            const resProxy = await fetch(proxyUrl);
+            if (resProxy.ok) data = await resProxy.json();
+          } catch (err) {
+            console.warn("CORS Proxy de başarısız oldu.");
           }
+        }
 
+        if (data) {
+          let rawList = Array.isArray(data) ? data : (data.data || []);
           if (rawList.length > 0) {
             const fetchedList = rawList.map(m => {
               const modelId = typeof m === 'string' ? m : (m.id || m.name);
               return { id: modelId, name: modelId, provider: 'Evren API' };
             });
-
             setAvailableModels(fetchedList);
-            if (fetchedList.length > 0 && !selectedModel) {
-              setSelectedModel(fetchedList[0].id);
-            }
+            setSelectedModel(fetchedList[0].id);
+            setIsFetchingModels(false);
+            return;
           }
-        } catch (error) {
-          console.warn("Modeller çekilirken hata oluştu:", error);
-        } finally {
-          setIsFetchingModels(false);
         }
+
+        // 3. Fallback: Varsayılan Liste
+        setAvailableModels(DEFAULT_MODELS);
+        if (!selectedModel) setSelectedModel(DEFAULT_MODELS[0].id);
+        setIsFetchingModels(false);
       };
 
-      // UYGULAMA VEYA SİTE YÜKLENDİĞİNDE OTOMATİK MODELLERİ ÇEK
       useEffect(() => {
         handleFetchModelsFromApi();
       }, [settings.baseUrl]);
 
-      // KULLANICI SOHBETLERİNİ VERİTABANINDAN ÇEKME
       const loadUserChats = async (userId) => {
         if (!supabaseClient || !userId) return;
         try {
@@ -387,26 +399,42 @@
 
         try {
           const headers = { 'Content-Type': 'application/json' };
-          if (settings.apiKey) {
-            headers['Authorization'] = `Bearer ${settings.apiKey}`;
+          if (settings.apiKey) headers['Authorization'] = `Bearer ${settings.apiKey}`;
+
+          let response;
+          try {
+            response = await fetch(`${settings.baseUrl}/chat/completions`, {
+              method: 'POST',
+              headers,
+              body: JSON.stringify({
+                model: selectedModel || 'evren-gpt-4o',
+                messages: [
+                  { role: 'system', content: settings.systemPrompt },
+                  ...targetChat.messages.map(m => ({ role: m.role, content: m.content })),
+                  { role: 'user', content: text }
+                ],
+                temperature: settings.temperature,
+                max_tokens: settings.maxTokens
+              })
+            });
+          } catch(e) {
+            // CORS Proxy Fallback
+            const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(settings.baseUrl + '/chat/completions')}`;
+            response = await fetch(proxyUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                model: selectedModel || 'evren-gpt-4o',
+                messages: [
+                  { role: 'system', content: settings.systemPrompt },
+                  ...targetChat.messages.map(m => ({ role: m.role, content: m.content })),
+                  { role: 'user', content: text }
+                ]
+              })
+            });
           }
 
-          const response = await fetch(`${settings.baseUrl}/chat/completions`, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({
-              model: selectedModel || (availableModels[0]?.id || 'default'),
-              messages: [
-                { role: 'system', content: settings.systemPrompt },
-                ...targetChat.messages.map(m => ({ role: m.role, content: m.content })),
-                { role: 'user', content: text }
-              ],
-              temperature: settings.temperature,
-              max_tokens: settings.maxTokens
-            })
-          });
-
-          if (response.ok) {
+          if (response && response.ok) {
             const data = await response.json();
             const aiText = data.choices[0]?.message?.content || 'Yanıt alınamadı.';
             const aiMsgId = `msg-${Date.now() + 1}`;
@@ -418,14 +446,14 @@
               await supabaseClient.from('messages').insert([newAiMsg]);
             }
           } else {
-            throw new Error('Evren API Yanıt Vermedi');
+            throw new Error('API Yanıt Vermedi');
           }
         } catch (err) {
           const mockAiMsg = {
             id: `msg-${Date.now() + 1}`,
             chat_id: currentChatId,
             role: 'assistant',
-            content: "⚠️ **Evren API Bağlantı Hatası:**\n\n`https://evren.ssyz.org.tr/llm` sunucusuna ulaşılamadı veya yanıt alınamadı."
+            content: "⚠️ **Evren API Bağlantı / CORS Uyarısı:**\n\nSunucunuza doğrudan veya proxy üzerinden erişilemedi. Sunucunuzda `Access-Control-Allow-Origin: *` başlığının tanımlı olduğundan emin olun."
           };
 
           setChats(prev => prev.map(c => c.id === currentChatId ? { ...c, messages: [...c.messages, mockAiMsg] } : c));
@@ -626,15 +654,11 @@
                   </button>
                   {modelDropdownOpen && (
                     <div className="absolute top-12 left-0 w-72 bg-slate-900 border border-slate-800 rounded-2xl p-2 z-50 shadow-2xl">
-                      {availableModels.length === 0 ? (
-                        <div className="p-3 text-xs text-slate-400 text-center">Model bulunamadı</div>
-                      ) : (
-                        availableModels.map(m => (
-                          <button key={m.id} onClick={() => { setSelectedModel(m.id); setModelDropdownOpen(false); }} className="w-full text-left px-3 py-2 rounded-xl text-xs hover:bg-slate-800 text-slate-200">
-                            {m.name}
-                          </button>
-                        ))
-                      )}
+                      {availableModels.map(m => (
+                        <button key={m.id} onClick={() => { setSelectedModel(m.id); setModelDropdownOpen(false); }} className="w-full text-left px-3 py-2 rounded-xl text-xs hover:bg-slate-800 text-slate-200">
+                          {m.name}
+                        </button>
+                      ))}
                     </div>
                   )}
                 </div>
